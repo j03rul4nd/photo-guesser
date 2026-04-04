@@ -8,17 +8,93 @@
 ## ESTADO ACTUAL DEL PROYECTO
 
 ```
-Fase:        1 — Fundación
-Sprint:      1.0 — Setup inicial
-Completado:  GitHub repo creado ✅
-             npm create vite@latest photo-guesser -- --template react-ts ✅
-             cd photo-guesser ✅
-Pendiente:   Todo lo demás (ver Fase 1 completa abajo)
+Fase:        3 — Features Core (flujo completo)
+Sprint:      3.1 — Pantalla de inicio + Unirse a partida (PENDIENTE)
+Completado:  Fase 1 completa ✅
+             Fase 2 completa ✅
+               Sprint 2.1 — Worker base con Hono y rutas HTTP ✅
+               Sprint 2.2 — Durable Object: state machine y WebSockets ✅
+               Sprint 2.3 — R2 upload y borrado ✅ TESTEADO EN PRODUCCIÓN
+             Deploy Worker a Cloudflare ✅
+             Deploy Frontend a Cloudflare Pages ✅
+             Variable de entorno VITE_API_URL configurada ✅
+             Bucket R2 photo-guesser-photos creado y funcionando ✅
+             Presigned URLs generándose correctamente ✅
+             Borrado por prefijo funcionando ✅
 ```
 
 **Repo GitHub:** [poner URL aquí]
-**Deploy Cloudflare Pages:** no configurado aún
-**Deploy Worker:** no configurado aún
+**Deploy Cloudflare Pages:** ✅ funcionando
+**Deploy Worker:** ✅ https://photo-guesser-worker.joelbenitezdonari.workers.dev
+**Variable de entorno:** `VITE_API_URL=https://photo-guesser-worker.joelbenitezdonari.workers.dev`
+
+---
+
+## LO QUE YA ESTÁ HECHO (no tocar, no refactorizar)
+
+### Fase 1 — Fundación ✅ COMPLETA
+
+**Estructura de monorepo:**
+- `frontend/` `worker/` `shared/` — estructura definitiva, en producción
+
+**Configuración frontend:**
+- `frontend/vite.config.ts` — Tailwind CSS 4 plugin + alias `@/` y `@shared/`
+- `frontend/tsconfig.app.json` — `strict: true` + path aliases
+- `frontend/index.html` — Google Fonts (Syne + Instrument Serif), viewport mobile
+- `frontend/public/fonts/` — Geist Variable y GeistMono Variable (woff2, copiados de npm)
+
+**Sistema de diseño (`frontend/src/`):**
+- `src/index.css` — tokens completos `:root` + `.dark`, grain, focus ring, `@theme` Tailwind 4, `@font-face` para Geist
+- `src/lib/utils.ts` — helper `cn()`
+- `src/components/ui/button.tsx` — Button con `active:scale(0.97)` en 80ms CSS, variantes: default/secondary/outline/ghost/destructive
+- `src/components/ui/card.tsx` — Card + CardHeader + CardTitle + CardContent + CardFooter
+- `src/components/ui/badge.tsx` — Badge con variantes de estado de juego (correct/incorrect/pending)
+- `src/components/ui/progress.tsx` — Progress overrideada
+- `src/components/ui/dialog.tsx` — Dialog overrideada con Radix
+- `src/components/shared/PolaroidFrame.tsx` — el componente identitario (padding Polaroid, shadow-photo, radius 2px)
+- `src/components/shared/LoadingReveal.tsx` — cuarto oscuro con GSAP (barra autónoma o progreso real)
+- `src/components/shared/RotatePrompt.tsx` — aviso landscape mobile
+
+**Routing + páginas:**
+- `src/main.tsx` — RouterProvider con todas las rutas: `/`, `/unirse`, `/sala/:code`, `/sala/:code/lobby`, `/sala/:code/juego`, `/design-system`
+- `src/pages/HomePage.tsx` — stub (Syne 800 sobre bg-primary)
+- `src/pages/JoinPage.tsx` — stub
+- `src/pages/SalaPage.tsx` — stub
+- `src/pages/LobbyPage.tsx` — stub
+- `src/pages/GamePage.tsx` — stub
+- `src/pages/DesignSystemPage.tsx` — página temporal de verificación visual (eliminar en Fase 3)
+
+**Schemas compartidos:**
+- `shared/schemas.ts` — contrato Zod completo: `ServerWSEventSchema`, `ClientWSEventSchema`, HTTP request/response schemas, `ERROR_CODES`, `ERROR_MESSAGES`
+
+### Fase 2 — Backend Core ✅ COMPLETA — TESTEADO EN PRODUCCIÓN
+
+**Worker (`worker/src/`):**
+- `types.ts` — `Env` interface + `RateLimitEntry`
+- `utils.ts` — `generateSalaCode()`, `generateJugadorId()`, `jsonError()`, `getClientIP()`, `normalizeSalaCode()`
+- `schemas.ts` — Zod schemas locales para HTTP y WS
+- `index.ts` — Hono 4 router completo:
+  - `POST /api/sala` — genera código, rate limiting 10/IP/hora, inicializa DO
+  - `POST /api/sala/:code/join` — valida Zod, delega al DO
+  - `POST /api/sala/:code/foto` — valida mimeType/sizeBytes, genera key R2, genera presigned URL
+  - `GET /api/sala/:code/ws` — WebSocket upgrade → DO
+  - `DELETE /api/sala/:code` — cierra sala, borra fotos R2 por prefijo
+  - `GET /health` — health check
+- `GameRoom.ts` — Durable Object completo:
+  - State machine: `waiting → lobby_ready → round_showing → round_results → game_over → resetting`
+  - HTTP internal routes: `/init`, `/join`, `/auth`, `/close`
+  - WebSocket manager: `Map<string, WebSocket>`, broadcast, sendTo
+  - Eventos cliente→servidor: `JOIN`, `FOTOS_READY`, `START_GAME`, `ANSWER`, `PLAY_AGAIN`
+  - Eventos servidor→cliente: todos los del contrato PRODUCT.md sección 9
+  - `PLAYER_RESPONSE_COUNT` solo al propietario de la foto ✅
+  - Lógica de rondas: Fisher-Yates shuffle, opciones, puntuación por velocidad
+  - DO Alarm: cleanup a los 30 minutos de inactividad
+  - Gestión de desconexiones y cambio de host automático
+
+**Deploy:**
+- Worker desplegado en Cloudflare ✅
+- Frontend desplegado en Cloudflare Pages ✅
+- `VITE_API_URL` configurada en `.env` local y en Cloudflare Pages ✅
 
 ---
 
@@ -43,7 +119,11 @@ photo-guesser/
 ├── worker/     ← Cloudflare Worker (Hono + DO + R2)
 └── shared/     ← Zod schemas compartidos frontend ↔ worker
 ```
-Esta es la estructura final desde el día 1. No crear `src/` en la raíz.
+
+### Variables de entorno
+- `VITE_API_URL=https://photo-guesser-worker.joelbenitezdonari.workers.dev`
+- En el frontend: usar siempre `import.meta.env.VITE_API_URL` como base URL para todas las llamadas HTTP y WebSocket al worker
+- El WebSocket usa `wss://` (no `ws://`) en producción — derivar automáticamente del `VITE_API_URL`
 
 ### CSS — tokens siempre, valores hardcoded nunca
 Nunca `color: #FF4D2E` en un componente. Siempre `color: var(--accent)`.
@@ -67,282 +147,27 @@ Los componentes de shadcn son la base técnica, no la estética. Cada componente
 
 ---
 
-## FASE 1 — FUNDACIÓN
-### Objetivo: Proyecto corriendo localmente con la identidad visual lista antes de tocar lógica de juego.
-### Duración estimada: 1-2 sesiones de trabajo
+## FASE 1 — FUNDACIÓN ✅ COMPLETA
 
----
-
-### Sprint 1.1 — Estructura de monorepo y dependencias
-**Estado: PENDIENTE**
-
-Comandos a ejecutar en orden exacto:
-
-```bash
-# Desde la raíz del proyecto (photo-guesser/)
-# 1. Crear estructura de carpetas
-mkdir -p frontend worker shared
-
-# 2. Mover el proyecto Vite a /frontend
-# (mover todos los archivos generados por create vite a /frontend/)
-
-# 3. Instalar dependencias frontend
-cd frontend
-npm install react-router-dom@latest
-npm install @tanstack/react-query@latest
-npm install zustand@latest
-npm install zod@latest
-npm install gsap@latest
-npm install framer-motion@latest
-npm install canvas-confetti@latest
-npm install clsx tailwind-merge
-npm install geist
-npm install -D @types/canvas-confetti
-
-# 4. Instalar shadcn/ui (interactivo — elegir: style=default, base color=neutral, CSS variables=yes)
-npx shadcn@latest init
-# Componentes a instalar ahora:
-npx shadcn@latest add button card dialog progress badge toast
-
-# 5. Setup Worker
-cd ../worker
-npm init -y
-npm install hono@latest zod@latest
-npm install -D wrangler@latest typescript @cloudflare/workers-types
-
-# 6. Crear tsconfig en worker/
-# (ver contenido en la tarea de worker más abajo)
-
-# 7. Crear wrangler.toml en worker/
-# (ver contenido en la tarea de worker más abajo)
-```
-
-**Archivos a crear en este sprint:**
-
-`shared/schemas.ts` — Zod schemas vacíos con la estructura completa (aunque sin implementación). Esto primero para que el resto importe desde aquí desde el día 1.
-
-`shared/tsconfig.json`:
-```json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ES2022",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "outDir": "./dist"
-  }
-}
-```
-
-`worker/wrangler.toml`:
-```toml
-name = "photo-guesser-worker"
-main = "src/index.ts"
-compatibility_date = "2024-01-01"
-compatibility_flags = ["nodejs_compat"]
-
-[[durable_objects.bindings]]
-name = "GAME_ROOM"
-class_name = "GameRoom"
-
-[[migrations]]
-tag = "v1"
-new_classes = ["GameRoom"]
-
-[[r2_buckets]]
-binding = "PHOTOS_BUCKET"
-bucket_name = "photo-guesser-photos"
-```
-
-**Tarea de verificación:** `cd frontend && npm run dev` debe arrancar en localhost sin errores.
-
----
-
-### Sprint 1.2 — Sistema de diseño y tokens CSS
-**Estado: PENDIENTE**
-**Depende de:** Sprint 1.1 completo
-
-Implementar todo el sistema visual de DESIGN.md antes de construir ningún componente. Esto garantiza que todos los componentes posteriores usen tokens desde el principio.
-
-**Archivos a crear/modificar:**
-
-`frontend/src/index.css` — debe contener el bloque completo de `:root { }` y `.dark { }` de DESIGN.md sección 10, más:
-```css
-/* Grain texture sobre el body */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  opacity: 0.03;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
-}
-.dark body::after { opacity: 0.06; }
-
-/* Reset focus ring global */
-*:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* Orientación landscape en mobile */
-@media (orientation: landscape) and (max-width: 767px) {
-  .game-layout { display: none; }
-  .rotate-prompt { display: flex; }
-}
-```
-
-`frontend/index.html` — añadir Google Fonts en el `<head>`:
-```html
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
-```
-
-`frontend/src/main.tsx` — importar Geist después del reset:
-```tsx
-import 'geist/dist/fonts/geist-sans/style.css'
-import 'geist/dist/fonts/geist-mono/style.css'
-import './index.css'
-```
-
-`frontend/tailwind.config.ts` — extender con los tokens:
-```ts
-// Mapear las CSS variables a clases de Tailwind para poder usar
-// bg-primary, text-accent, etc. en los componentes
-export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
-  theme: {
-    extend: {
-      colors: {
-        'bg-primary': 'var(--bg-primary)',
-        'bg-secondary': 'var(--bg-secondary)',
-        'bg-surface': 'var(--bg-surface)',
-        'text-primary': 'var(--text-primary)',
-        'text-secondary': 'var(--text-secondary)',
-        'text-muted': 'var(--text-muted)',
-        'accent': 'var(--accent)',
-        'correct': 'var(--correct)',
-        'incorrect': 'var(--incorrect)',
-        'pending': 'var(--pending)',
-      },
-      fontFamily: {
-        display: ['Syne', 'sans-serif'],
-        ui: ['Geist', 'sans-serif'],
-        mono: ['Geist Mono', 'monospace'],
-        body: ['Instrument Serif', 'serif'],
-      },
-      boxShadow: {
-        'sm': 'var(--shadow-sm)',
-        'md': 'var(--shadow-md)',
-        'lg': 'var(--shadow-lg)',
-        'photo': 'var(--shadow-photo)',
-      },
-      borderRadius: {
-        'photo': 'var(--radius-photo)',
-      }
-    }
-  }
-}
-```
-
-**Componentes compartidos a crear en este sprint:**
-
-`frontend/src/components/shared/PolaroidFrame.tsx` — el componente más identitario del producto. Acepta `children` (la imagen), `caption?: string`, y `className?`. Aplica el padding inferior mayor, shadow-photo, border-radius: 2px.
-
-`frontend/src/components/shared/LoadingReveal.tsx` — el estado de carga con animación de cuarto oscuro. Acepta `message: string` y `progress?: number` (0-100). Si no hay progress, la barra avanza con animación autónoma GSAP que desacelera al 80%.
-
-`frontend/src/components/shared/RotatePrompt.tsx` — el aviso de orientación. Solo se muestra en landscape + mobile via CSS.
-
-**Override shadcn Button:** El componente Button de shadcn debe ser modificado para que su variante `default` use los estados de DESIGN.md sección 6 (incluyendo el `active: scale(0.97)` en 80ms via CSS, no JS).
-
-**Tarea de verificación:** Crear una página temporal `frontend/src/pages/DesignSystemPage.tsx` que muestre todos los tokens: colores, tipografías, sombras, el PolaroidFrame con una imagen placeholder. Esta página se elimina antes de la Fase 2. Si todo se ve como DESIGN.md, el sprint está completo.
-
----
-
-### Sprint 1.3 — Routing y páginas vacías
-**Estado: PENDIENTE**
-**Depende de:** Sprint 1.2 completo
-
-Configurar React Router con todas las rutas del producto, aunque las páginas estén vacías. Esto evita tener que refactorizar el routing cuando se implemente cada feature.
-
-`frontend/src/main.tsx`:
-```tsx
-import { RouterProvider, createBrowserRouter } from 'react-router-dom'
-
-const router = createBrowserRouter([
-  { path: '/', element: <HomePage /> },
-  { path: '/unirse', element: <JoinPage /> },           // Escenario B: formulario manual
-  { path: '/sala/:code', element: <SalaPage /> },        // Escenario A: link directo
-  { path: '/sala/:code/lobby', element: <LobbyPage /> },
-  { path: '/sala/:code/juego', element: <GamePage /> },
-])
-```
-
-Cada página es un componente mínimo que solo muestra su nombre en Syne 800 sobre fondo `--bg-primary`. No hay lógica. Solo la ruta existe y renderiza algo.
-
-**Tarea de verificación:** Navegar manualmente a cada ruta en el browser. Todas deben renderizar sin errores 404 ni crashes.
+### Sprint 1.1 — Estructura de monorepo y dependencias ✅
+### Sprint 1.2 — Sistema de diseño y tokens CSS ✅
+### Sprint 1.3 — Routing y páginas vacías ✅
 
 ---
 
 ## FASE 2 — BACKEND CORE
-### Objetivo: Worker funcionando localmente con Durable Object, WebSockets y R2. Sin frontend real aún — testear con herramientas de desarrollo (wscat, curl, Postman).
-### Duración estimada: 2-3 sesiones de trabajo
+### Objetivo: Worker funcionando localmente y en producción con Durable Object, WebSockets y R2.
 
 ---
 
-### Sprint 2.1 — Worker base con Hono y rutas HTTP
-**Estado: PENDIENTE**
-**Depende de:** Fase 1 completa
+### Sprint 2.1 — Worker base con Hono y rutas HTTP ✅ COMPLETO
+### Sprint 2.2 — Durable Object: state machine y WebSockets ✅ COMPLETO ✅ COMPLETO — TESTEADO EN PRODUCCIÓN
 
-Implementar todas las rutas HTTP del Worker con validación Zod pero sin el Durable Object aún (respuestas mock).
-
-Rutas a implementar:
-- `POST /api/sala` → genera código, devuelve `{ codigo, joinUrl }`
-- `POST /api/sala/:code/join` → valida código y nickname, devuelve `{ jugadorId, nickname }`
-- `POST /api/sala/:code/foto` → genera presigned URL de R2, devuelve `{ uploadUrl, key }`
-- `GET /api/sala/:code/ws` → stub que devuelve 501 hasta el sprint siguiente
-- `DELETE /api/sala/:code` → stub
-
-Toda la validación de entrada usa Zod. Los schemas están en `shared/schemas.ts`.
-Rate limiting en `POST /api/sala`: máx 10 salas por IP/hora. Implementar con un Map en memoria del Worker (no persiste entre instancias, suficiente para MVP).
-
-**Tarea de verificación:** `curl -X POST http://localhost:8787/api/sala` devuelve `{ codigo: "ABCD123", joinUrl: "..." }` con código 201.
-
----
-
-### Sprint 2.2 — Durable Object: state machine y WebSockets
-**Estado: PENDIENTE**
-**Depende de:** Sprint 2.1 completo
-
-El Durable Object es la pieza más compleja del backend. Implementar en este orden:
-
-1. **Estructura base del DO** — clase `GameRoom` con `fetch()` que acepta WebSocket upgrades
-2. **Gestión de conexiones** — `Map<string, WebSocket>`, broadcast a todos, broadcast a uno
-3. **State machine** — los 6 estados de PRODUCT.md sección 4.2: `waiting → lobby_ready → round_showing → round_results → game_over → resetting`
-4. **Eventos cliente→servidor** — `JOIN`, `FOTOS_READY`, `START_GAME`, `ANSWER`, `PLAY_AGAIN`
-5. **Eventos servidor→cliente** — todos los eventos del contrato de PRODUCT.md sección 9
-6. **DO Alarm** — cleanup automático a los 30 minutos de inactividad
-
-El evento `PLAYER_RESPONSE_COUNT` se emite **solo al jugador propietario de la foto** cada vez que alguien responde. Nunca a los demás jugadores.
-
-Los errores se emiten como `{ type: 'ERROR', code: string, message: string }` usando los códigos estandarizados de PRODUCT.md sección 9.
-
-**Tarea de verificación:** Usar `wscat -c ws://localhost:8787/api/sala/TEST01/ws` y enviar `{ "type": "JOIN", "nickname": "Ana" }`. Debe recibir `{ "type": "LOBBY_UPDATE", "jugadores": [...] }`.
-
----
-
-### Sprint 2.3 — R2: upload y borrado
-**Estado: PENDIENTE**
-**Depende de:** Sprint 2.2 completo
-
-- Presigned URLs con TTL 1 hora
-- Validación: solo imágenes (`image/jpeg`, `image/png`, `image/webp`, `image/heic`), máx 5MB
-- Borrado por prefijo `fotos/{salaCode}/` al terminar la partida o en el DO Alarm
-- Generar presigned URL nueva al inicio de cada ronda (por si la anterior expiró)
-
-**Tarea de verificación:** `POST /api/sala/TEST01/foto` devuelve `{ uploadUrl, key }`. Hacer PUT con una imagen a esa URL. La imagen existe en R2. Al llamar `DELETE /api/sala/TEST01`, la imagen desaparece.
+- Bucket `photo-guesser-photos` creado y activo en Cloudflare R2
+- Presigned URLs generándose correctamente desde el Worker
+- PUT directo desde cliente a R2 funcionando
+- Borrado por prefijo `fotos/{salaCode}/` verificado en producción
+- `getSignedUrl()` en `GameRoom.ts` genera URLs reales (no fallback) en producción
 
 ---
 
@@ -350,25 +175,59 @@ Los errores se emiten como `{ type: 'ERROR', code: string, message: string }` us
 ### Objetivo: El flujo completo funciona de punta a punta: crear sala → unirse → elegir fotos → jugar → resultado. Sin animaciones de juego aún — solo la lógica.
 ### Duración estimada: 3-4 sesiones de trabajo
 
+> **Nota crítica para el próximo chat:** El frontend aún tiene páginas stub. Toda la Fase 3 construye sobre `VITE_API_URL` para conectar con el worker ya desplegado. Usar `import.meta.env.VITE_API_URL` en todas las llamadas. Para WebSocket: `wss://` derivado de `VITE_API_URL`.
+
 ---
 
 ### Sprint 3.1 — Pantalla de inicio + Unirse a partida
 **Estado: PENDIENTE**
 **Depende de:** Fase 2 completa
 
+**Archivos lib/ a crear primero (base para toda la Fase 3):**
+
+`frontend/src/lib/api.ts` — cliente HTTP centralizado:
+```typescript
+// Base URL del worker — siempre desde la variable de entorno
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8787'
+
+// WebSocket URL: https → wss, http → ws
+export function getWsUrl(salaCode: string, jugadorId: string): string {
+  const base = API_BASE.replace(/^https/, 'wss').replace(/^http/, 'ws')
+  return `${base}/api/sala/${salaCode}/ws?jugadorId=${jugadorId}`
+}
+
+export const api = {
+  crearSala: () => fetch(`${API_BASE}/api/sala`, { method: 'POST' }),
+  unirse: (code: string, nickname: string) => fetch(`${API_BASE}/api/sala/${code}/join`, { ... }),
+  subirFoto: (code: string, body: FotoUploadRequest) => fetch(`${API_BASE}/api/sala/${code}/foto`, { ... }),
+  cerrarSala: (code: string) => fetch(`${API_BASE}/api/sala/${code}`, { method: 'DELETE' }),
+}
+```
+
+`frontend/src/lib/privacy.ts`:
+```typescript
+const KEY = 'pg_privacy_seen'
+export const privacy = {
+  hasSeen: () => { try { return !!localStorage.getItem(KEY) } catch { return false } },
+  markSeen: () => { try { localStorage.setItem(KEY, '1') } catch { /* noop */ } },
+}
+```
+
+`frontend/src/lib/share.ts` — helpers de compartir sala
+
 **HomePage.tsx:**
-- Logo "PHOTO GUESSER" con GUESSER en `--accent`
+- Logo "PHOTO GUESSER" con GUESSER en `var(--accent)`
 - Tagline en Instrument Serif italic
 - Botones "Crear partida" y "Unirse a partida"
-- Siluetas Polaroid en el fondo (posición absoluta, opacity 0.08, `--bg-secondary`)
+- Siluetas Polaroid en el fondo (posición absoluta, opacity 0.08, `var(--bg-secondary)`)
 - Animación de entrada: GSAP al montar (logo back.out, botones stagger)
-- Al pulsar "Crear partida": `POST /api/sala` → redirect a `/sala/:code` (Escenario A del join)
+- Al pulsar "Crear partida": `POST /api/sala` → redirect a `/sala/:code`
 
 **JoinPage.tsx** (Escenario B — formulario manual):
 - Campo código + campo nickname
 - Auto-uppercase en el campo de código
 - Validación inline con shake GSAP en error
-- `PrivacyNotice.tsx` debajo del botón si `!localStorage.getItem('pg_privacy_seen')`
+- `PrivacyNotice.tsx` debajo del botón si `!privacy.hasSeen()`
 - Al enviar: `POST /api/sala/:code/join` → redirect al lobby
 
 **SalaPage.tsx** (Escenario A — link directo):
@@ -377,12 +236,19 @@ Los errores se emiten como `{ type: 'ERROR', code: string, message: string }` us
 - `PrivacyNotice.tsx` igual que en JoinPage
 - Al enviar: `POST /api/sala/:code/join` → redirect al lobby
 
-**ShareRoom.tsx** (aparece al crear sala antes del lobby):
+**ShareRoom.tsx** (componente, no página):
 - Código grande en Geist Mono con botón copiar
-- QR dentro de `<PolaroidFrame>`
-- Botones de compartir: WhatsApp, copiar link, Web Share API (degradación silenciosa si no disponible)
-- Animación GSAP del código (flip reveal + stagger de caracteres)
-- `PrivacyNotice.tsx` aquí también (el creador también debe verlo)
+- QR dentro de `<PolaroidFrame>` via `api.qrserver.com`
+- Botones: WhatsApp, copiar link, Web Share API (degradación silenciosa)
+- Animación GSAP del código (flip reveal + stagger)
+- `PrivacyNotice.tsx` aquí también
+
+**Componentes a crear en `features/sala/components/`:**
+- `CreateRoom.tsx`
+- `JoinRoom.tsx`
+- `ShareRoom.tsx`
+- `RoomQR.tsx`
+- `PrivacyNotice.tsx`
 
 ---
 
@@ -390,18 +256,8 @@ Los errores se emiten como `{ type: 'ERROR', code: string, message: string }` us
 **Estado: PENDIENTE**
 **Depende de:** Sprint 3.1 completo
 
-**Lobby.tsx:**
-- `useGameSocket` hook: gestiona el WebSocket lifecycle, reconexión automática con backoff exponencial (intentos: 1s, 2s, 4s, máx 10s)
-- Lista de jugadores con estado usando `AnimatePresence` de Motion
-- Card de jugador: borde izquierdo 3px cambia color según estado con Motion
-- Botón "Elegir mis fotos" → abre `PhotoSelector.tsx`
-- Botón "Iniciar partida" (solo host, solo habilitado con ≥2 jugadores listos)
-- El código de sala siempre visible en el header (pequeño, con botón copiar)
-- Banner de reconexión cuando se pierde la conexión
-
-**useGameSocket hook:**
+**`features/juego/hooks/useGameSocket.ts`** — el hook más importante del frontend:
 ```typescript
-// Contrato mínimo del hook
 function useGameSocket(salaCode: string, jugadorId: string) {
   return {
     estado: 'connecting' | 'connected' | 'disconnected' | 'reconnecting',
@@ -411,8 +267,17 @@ function useGameSocket(salaCode: string, jugadorId: string) {
   }
 }
 ```
+- URL del WebSocket: `getWsUrl(salaCode, jugadorId)` de `lib/api.ts` — usa `VITE_API_URL`
+- Reconexión automática con backoff exponencial (1s, 2s, 4s, máx 10s)
+- Valida todos los mensajes entrantes con `ServerWSEventSchema.safeParse()`
+- Mensajes que no pasan Zod se descartan silenciosamente
 
-**Tarea de verificación:** Abrir la app en dos tabs del browser. Unirse con nicknames distintos. Los dos deben verse mutuamente en el lobby en tiempo real.
+**`features/lobby/`:**
+- `Lobby.tsx` — lista de jugadores con `AnimatePresence` + botón "Iniciar partida" (solo host)
+- `PlayerList.tsx` — lista animada con Motion
+- `PlayerStatus.tsx` — card con borde izquierdo según estado
+
+**Tarea de verificación:** Abrir la app en dos tabs. Unirse con nicknames distintos. Los dos deben verse mutuamente en el lobby en tiempo real contra el worker desplegado en Cloudflare.
 
 ---
 
@@ -420,28 +285,17 @@ function useGameSocket(salaCode: string, jugadorId: string) {
 **Estado: PENDIENTE**
 **Depende de:** Sprint 3.2 completo
 
-**PhotoSelector.tsx** — el orquestador:
-- Modo B (Random) como hero: botón full-width con dado que rota al activarse
-- Separador "— o elige tú mismo ↓ —"
-- Modo A (manual) y Modo C (categorías) como botones secundarios en la misma fila
-- `PhotoProgressBar.tsx`: visualización de tira de cine con `X/10 fotos listas`
-- Grid de miniaturas 3 columnas en mobile
-- Botón ✕ en cada miniatura (área touch mínima 44px)
-- Botón "Reemplazar" cuando se elimina una foto en Modo B
-- Botón "✅ Confirmar" deshabilitado si < 10 fotos
-- `usePhotoUpload` hook: sube fotos a R2 una a una, actualiza progreso en `LoadingReveal`
-- Al confirmar: emit `FOTOS_READY { fotoKeys }` via WebSocket
+**`features/fotos/`:**
+- `PhotoSelector.tsx` — Modo B como hero, Modo A como secundario
+- `RandomPickBtn.tsx` — botón full-width con dado que rota (CSS)
+- `PhotoGrid.tsx` — grid 3 columnas, miniaturas con botón ✕
+- `PhotoProgressBar.tsx` — tira de cine X/10
 
-**usePhotoRandom hook:**
-```typescript
-function usePhotoRandom() {
-  return {
-    pickRandom: (files: File[], count: number) => File[],  // Fisher-Yates
-    pool: File[],      // pool original para reemplazos
-    replace: (index: number) => File,  // reemplaza una foto del pool
-  }
-}
-```
+**Hooks:**
+- `usePhotoRandom.ts` — Fisher-Yates, pool para reemplazos
+- `usePhotoUpload.ts` — sube a R2 una a una via `VITE_API_URL`, actualiza progreso en `LoadingReveal`
+
+Al confirmar: `sendMessage({ type: 'FOTOS_READY', fotoKeys })`
 
 ---
 
@@ -449,17 +303,16 @@ function usePhotoRandom() {
 **Estado: PENDIENTE**
 **Depende de:** Sprint 3.3 completo
 
-En este sprint la pantalla de juego funciona correctamente pero con animaciones básicas (fade/opacity). Las animaciones GSAP de juego se añaden en el sprint siguiente.
+**`features/juego/`:**
+- `GameRound.tsx` — layout: header + foto en `<PolaroidFrame>` + pregunta + opciones 2x2
+- `Timer.tsx` — SVG circular 15s, progresión de color (sin pulse GSAP aún)
+- `AnswerOptions.tsx` — 4 botones, `min-height: 54px`, feedback táctil CSS
+- `OwnerWaiting.tsx` — "foto es tuya" con `ResponseDots.tsx`
+- `ResponseDots.tsx` — puntos de luz que reaccionan a `PLAYER_RESPONSE_COUNT`
+- `RoundResult.tsx` — resultado de ronda
+- `FinalRanking.tsx` — pantalla final con ranking
 
-**GameRound.tsx:**
-- Layout: header fijo (ronda X/Y + timer SVG) + foto + pregunta + opciones 2x2
-- La foto dentro de `<PolaroidFrame>` con `border-radius: 2px`
-- `Timer.tsx`: SVG circular que se vacía en 15s. Solo la progresión de color (neutro → accent → urgente) sin el efecto pulse de GSAP aún.
-- `AnswerOptions.tsx`: 4 botones, `min-height: 54px`. El feedback táctil (scale 0.96) en CSS puro.
-- `OwnerWaiting.tsx`: el estado "foto es tuya" con `ResponseDots.tsx`. Los puntos se actualizan al recibir `PLAYER_RESPONSE_COUNT`.
-- En desktop (≥1024px): layout de dos columnas con mini ranking en sidebar.
-
-**Estado Zustand `juegoSlice`:**
+**Store Zustand `juegoSlice`:**
 ```typescript
 interface JuegoState {
   faseRonda: 'idle' | 'showing' | 'answered' | 'result'
@@ -468,150 +321,40 @@ interface JuegoState {
   rankingActual: RankingItem[]
   miPuntuacion: number
   esMiFoto: boolean
-  respuestaCount: { count: number; total: number }  // para ResponseDots
+  respuestaCount: { count: number; total: number }
 }
 ```
 
-**Tarea de verificación:** Jugar una partida completa de 3 rondas con 2 jugadores reales (dos tabs del browser). Sin animaciones de juego, pero todo el flujo debe funcionar: revelar foto, responder, ver resultado, siguiente ronda, pantalla final.
+**Tarea de verificación:** Jugar una partida completa de 3 rondas con 2 jugadores reales (dos tabs del browser, contra el worker en producción). Flujo completo sin animaciones de juego.
 
 ---
 
 ## FASE 4 — ANIMACIONES DE JUEGO
-### Objetivo: Implementar todos los GSAP timelines de PRODUCT.md sección 6. La experiencia pasa de "funciona" a "se siente como un juego".
+### Objetivo: Implementar todos los GSAP timelines de PRODUCT.md sección 6.
 ### Duración estimada: 1-2 sesiones de trabajo
 
-> **Instrucción para el chat de esta fase:** Adjunta DESIGN.md, PRODUCT.md y PROGRESS.md. El asistente debe leer la sección 6 de PRODUCT.md y la sección 7 de DESIGN.md antes de escribir cualquier animación. Implementar en el orden exacto de abajo para detectar problemas de rendimiento temprano.
+> **Instrucción para el chat de esta fase:** El asistente debe leer la sección 6 de PRODUCT.md y la sección 7 de DESIGN.md antes de escribir cualquier animación.
 
 ---
 
-### Sprint 4.1 — Animaciones de UI (no de juego)
-**Estado: PENDIENTE**
-**Depende de:** Fase 3 completa
-
-- Entrada del logo en HomePage (GSAP, back.out)
-- Entrada de botones en HomePage (GSAP, stagger)
-- Entrada del código de sala en ShareRoom (flip reveal + stagger de caracteres)
-- Entrada del QR (elastic.out)
-- Transición lobby → juego (zoom-out + fade → "¡Que empiece!" → fade al juego)
-- Animación del dado en RandomPickBtn (CSS rotate 360°)
-- Shake horizontal en errores de formulario (GSAP `x: [-4, 4, -4, 0]`)
-
-### Sprint 4.2 — Timeline del reveal de foto
-**Estado: PENDIENTE**
-**Depende de:** Sprint 4.1 completo
-
-Implementar el timeline completo de PRODUCT.md sección 6.3 "Reveal de foto":
-- Overlay oscurece (200ms)
-- Foto entra desde abajo con overshoot (350ms, expo.out)
-- Pregunta aparece con elastic (200ms)
-- Opciones en stagger (25ms × 4 opciones, back.out)
-- Total: ~900ms
-
-Este es el momento más importante del producto. Testear en mobile real antes de dar por bueno.
-
-### Sprint 4.3 — Timer urgente y animaciones de respuesta
-**Estado: PENDIENTE**
-**Depende de:** Sprint 4.2 completo
-
-- Timer SVG con `strokeDashoffset` GSAP y easing que acelera al final
-- Progresión de color del timer (incluyendo el número central)
-- Pulse de urgencia en los últimos 3 segundos
-- Bump del número en cada segundo
-- Puntos de luz `ResponseDots` con micro-animación elastic al activarse
-
-### Sprint 4.4 — Timeline de resultado de ronda + puntos volando
-**Estado: PENDIENTE**
-**Depende de:** Sprint 4.3 completo
-
-- Opciones incorrectas se desvanecen (200ms)
-- Opción correcta se ilumina y escala
-- Nombre del dueño aparece sobre la foto (label Polaroid)
-- Puntos "+100/+75/+50" aparecen y viajan en arco al marcador
-- canvas-confetti burst pequeño al acertar
-- Mini ranking se reordena con Motion layout
-
-### Sprint 4.5 — Timeline de pantalla final
-**Estado: PENDIENTE**
-**Depende de:** Sprint 4.4 completo
-
-- Entrada del título "FIN DE LA PARTIDA" (expo.out desde arriba)
-- Cards de jugadores en stagger desde abajo
-- Ganador: scale + glow dorado
-- canvas-confetti burst grande (3 segundos)
-- Pulse del botón "Jugar otra vez" cada 3 segundos
+### Sprint 4.1 — Animaciones de UI (no de juego) — PENDIENTE
+### Sprint 4.2 — Timeline del reveal de foto — PENDIENTE
+### Sprint 4.3 — Timer urgente y animaciones de respuesta — PENDIENTE
+### Sprint 4.4 — Timeline de resultado de ronda + puntos volando — PENDIENTE
+### Sprint 4.5 — Timeline de pantalla final — PENDIENTE
 
 ---
 
 ## FASE 5 — PULIDO Y DEPLOY
-### Objetivo: El producto está listo para que amigos lo usen de verdad.
-### Duración estimada: 1-2 sesiones de trabajo
-
----
-
-### Sprint 5.1 — Estados de error completos
-**Estado: PENDIENTE**
-**Depende de:** Fase 4 completa
-
-Implementar todos los estados de error de DESIGN.md sección 5.10:
-- Toast para errores transitorios (subida fallida, etc.) con Motion slide desde abajo
-- Pantalla de "Sala no encontrada" con Polaroid en blanco
-- Banner de reconexión con icono rotando
-- Todos los mensajes de error usando el microcopy del producto (nunca códigos técnicos)
-
-### Sprint 5.2 — `prefers-reduced-motion` y accesibilidad final
-**Estado: PENDIENTE**
-**Depende de:** Sprint 5.1 completo
-
-- `gsap.globalTimeline.timeScale(0)` cuando `prefers-reduced-motion: reduce` está activo
-- Animaciones funcionales simplificadas (timer, feedback de respuesta) pero presentes
-- Audit de todos los `aria-label` faltantes
-- Verificar orden de tabulación en pantalla de juego
-- `aria-live="polite"` en el timer
-
-### Sprint 5.3 — Modo oscuro
-**Estado: PENDIENTE**
-**Depende de:** Sprint 5.2 completo
-
-- Toggle de modo oscuro (guardado en localStorage)
-- Todos los tokens del modo `.dark` de DESIGN.md sección 10
-- El frame Polaroid en modo oscuro: `border: 1px solid rgba(240, 235, 227, 0.12)`
-- `RotatePrompt` en modo oscuro
-
-### Sprint 5.4 — Deploy y configuración Cloudflare
-**Estado: PENDIENTE**
-**Depende de:** Sprint 5.3 completo
-
-```bash
-# Worker
-cd worker
-npx wrangler login
-npx wrangler r2 bucket create photo-guesser-photos
-npx wrangler deploy
-
-# Frontend
-cd ../frontend
-# Conectar repo GitHub a Cloudflare Pages desde el dashboard
-# Build command: npm run build
-# Build output: dist
-# Root directory: frontend
-```
-
-Variables de entorno a configurar en Cloudflare Pages:
-- `VITE_API_URL` = URL del Worker desplegado
-
-### Sprint 5.5 — Testing con usuarios reales
-**Estado: PENDIENTE**
-**Depende de:** Sprint 5.4 completo
-
-Hacer una partida real con al menos 3 personas en dispositivos distintos (no simulados). Observar sin intervenir. Los puntos que alguien no entiende en menos de 30 segundos son bugs de UX, no de código.
-
-Checklist mínimo:
-- [ ] El no-gamer del grupo puede unirse y subir fotos sin preguntar nada
-- [ ] El código de sala se puede compartir por WhatsApp y funciona al abrirlo
-- [ ] El timer se siente urgente en los últimos 3 segundos
-- [ ] El reveal de la foto genera una reacción visible en el grupo
-- [ ] La partida completa dura entre 5 y 12 minutos con 10 rondas
-- [ ] Las fotos se borran correctamente (verificar en panel R2 después)
+### Sprint 5.1 — Estados de error completos — PENDIENTE
+### Sprint 5.2 — `prefers-reduced-motion` y accesibilidad final — PENDIENTE
+### Sprint 5.3 — Modo oscuro — PENDIENTE
+### Sprint 5.4 — Deploy y configuración Cloudflare — ✅ COMPLETO
+- Worker desplegado y funcionando en producción
+- Frontend desplegado en Cloudflare Pages
+- Bucket R2 creado y operativo
+- `VITE_API_URL` configurada en `.env` local y en Cloudflare Pages dashboard
+### Sprint 5.5 — Testing con usuarios reales — PENDIENTE
 
 ---
 
@@ -626,8 +369,8 @@ Cuando se abra un chat nuevo con este archivo adjunto, el asistente debe:
 5. **Cuando escriba código TypeScript**, todos los tipos deben estar definidos. No `as any` sin comentario explicativo.
 6. **Los tokens CSS siempre por variable CSS**, nunca valores hardcoded en componentes.
 7. **Si hay ambigüedad** entre DESIGN.md y PRODUCT.md, DESIGN.md tiene precedencia en decisiones visuales, PRODUCT.md en decisiones de lógica y contrato de datos.
+8. **VITE_API_URL ya está configurada** — usar siempre `import.meta.env.VITE_API_URL` como base, nunca hardcodear la URL del worker. El WebSocket debe derivar `wss://` de esa variable.
 
 ---
 
-*Actualiza el "Estado actual" al inicio de este archivo cada vez que completes un sprint.*
-*Versión: 1.0 — Creado al inicio del proyecto.*
+*Versión: 1.2 — Actualizado tras completar Fase 2 completa (incluyendo R2 testeado en producción). Próximo: Fase 3 Sprint 3.1.*
