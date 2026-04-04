@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type CSSProperties } from 'react'
 import { gsap } from 'gsap'
 import { cn } from '@/lib/utils'
 
@@ -7,6 +7,7 @@ interface LoadingRevealProps {
   /** 0–100. Si no se pasa, la barra avanza sola con animación autónoma. */
   progress?: number
   className?: string
+  style?: CSSProperties
 }
 
 /**
@@ -14,7 +15,7 @@ interface LoadingRevealProps {
  * La barra avanza con GSAP que desacelera al 80% y espera hasta resolución.
  * Cuando se pasa `progress`, la barra refleja el progreso real.
  */
-export function LoadingReveal({ message, progress, className }: LoadingRevealProps) {
+export function LoadingReveal({ message, progress, className, style }: LoadingRevealProps) {
   const barRef = useRef<HTMLDivElement>(null)
   const tweenRef = useRef<gsap.core.Tween | null>(null)
 
@@ -53,6 +54,7 @@ export function LoadingReveal({ message, progress, className }: LoadingRevealPro
         'bg-[var(--bg-primary)]',
         className
       )}
+      style={style}
       role="status"
       aria-label={message}
     >

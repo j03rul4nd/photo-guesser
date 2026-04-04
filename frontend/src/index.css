@@ -180,3 +180,16 @@ button, [role="button"] {
 .font-body    { font-family: var(--font-body); }
 
 .shadow-photo { box-shadow: var(--shadow-photo); }
+
+/* ─── Polaroid en modo noche — borde sutil para legibilidad ───────────────── */
+
+.dark .shadow-photo,
+.dark [style*="shadow-photo"] {
+  border: 1px solid rgba(240, 235, 227, 0.12);
+}
+
+/* ─── Scroll suave global ──────────────────────────────────────────────────── */
+
+html {
+  scroll-behavior: smooth;
+}
