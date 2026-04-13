@@ -3,17 +3,23 @@ import type { RankingItem } from '@shared/schemas'
 
 type FaseRonda = 'idle' | 'showing' | 'answered' | 'result'
 
+interface Opcion {
+  id: string
+  nickname: string
+}
+
 interface FotoActual {
   url: string
-  opciones: string[]
+  opciones: Opcion[]
   rondaNum: number
   totalRondas: number
+  timerMs: number  // duración real recibida del servidor (puede ser < 15000 al reconectar)
 }
 
 interface JuegoState {
   faseRonda: FaseRonda
   fotoActual: FotoActual | null
-  respuestaSeleccionada: string | null
+  respuestaSeleccionada: string | null  // ID del jugador seleccionado
   rankingActual: RankingItem[]
   miPuntuacion: number
   esMiFoto: boolean
@@ -23,9 +29,10 @@ interface JuegoState {
   puntosGanados: Record<string, number>
   gameOver: boolean
   rankingFinal: Array<{ id: string; nickname: string; puntosTotal: number; fotosAdivinadas: number }>
+  totalRondasPartida: number  // total recibido en GAME_START
 
   setFotoActual: (foto: FotoActual, esMiFoto: boolean) => void
-  setRespuesta: (respuesta: string) => void
+  setRespuesta: (jugadorId: string) => void
   setFaseRonda: (fase: FaseRonda) => void
   setRespuestaCount: (count: number, total: number) => void
   setRoundResult: (data: {
@@ -36,6 +43,7 @@ interface JuegoState {
     miId: string
   }) => void
   setGameOver: (rankingFinal: JuegoState['rankingFinal']) => void
+  setTotalRondasPartida: (total: number) => void
   reset: () => void
 }
 
@@ -52,6 +60,7 @@ const initialState = {
   puntosGanados: {},
   gameOver: false,
   rankingFinal: [],
+  totalRondasPartida: 0,
 }
 
 export const useJuegoStore = create<JuegoState>((set) => ({
@@ -88,6 +97,8 @@ export const useJuegoStore = create<JuegoState>((set) => ({
     })),
 
   setGameOver: (rankingFinal) => set({ gameOver: true, faseRonda: 'idle', rankingFinal }),
+
+  setTotalRondasPartida: (totalRondasPartida) => set({ totalRondasPartida }),
 
   reset: () => set(initialState),
 }))

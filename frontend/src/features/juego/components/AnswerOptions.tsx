@@ -1,28 +1,28 @@
-import type { RankingItem } from '@shared/schemas'
+interface Opcion {
+  id: string
+  nickname: string
+}
 
 interface AnswerOptionsProps {
-  opciones: string[]
-  seleccionada: string | null
-  correctas: string[]           // nicknames correctos (en fase resultado)
+  opciones: Opcion[]
+  seleccionada: string | null   // ID del jugador seleccionado
+  correcta: string              // nickname del dueño real (en fase resultado)
   faseRonda: 'showing' | 'answered' | 'result'
-  onSelect: (opcion: string) => void
+  onSelect: (jugadorId: string) => void
 }
 
 function getEstadoOpcion(
-  opcion: string,
+  opcion: Opcion,
   seleccionada: string | null,
-  correctas: string[],
+  correcta: string,
   fase: AnswerOptionsProps['faseRonda'],
 ): 'normal' | 'selected' | 'correct' | 'incorrect' | 'faded' {
-  if (fase === 'showing') {
-    return opcion === seleccionada ? 'selected' : 'normal'
-  }
-  if (fase === 'answered') {
-    return opcion === seleccionada ? 'selected' : 'normal'
+  if (fase === 'showing' || fase === 'answered') {
+    return opcion.id === seleccionada ? 'selected' : 'normal'
   }
   // fase === 'result'
-  if (correctas.includes(opcion)) return 'correct'
-  if (opcion === seleccionada) return 'incorrect'
+  if (opcion.nickname === correcta) return 'correct'
+  if (opcion.id === seleccionada) return 'incorrect'
   return 'faded'
 }
 
@@ -67,7 +67,7 @@ const estadoStyles: Record<ReturnType<typeof getEstadoOpcion>, React.CSSProperti
 export function AnswerOptions({
   opciones,
   seleccionada,
-  correctas,
+  correcta,
   faseRonda,
   onSelect,
 }: AnswerOptionsProps) {
@@ -82,14 +82,14 @@ export function AnswerOptions({
       }}
     >
       {opciones.map((opcion) => {
-        const estado = getEstadoOpcion(opcion, seleccionada, correctas, faseRonda)
+        const estado = getEstadoOpcion(opcion, seleccionada, correcta, faseRonda)
         const estilos = estadoStyles[estado]
 
         return (
           <button
-            key={opcion}
+            key={opcion.id}
             disabled={!puedeResponder}
-            onClick={() => puedeResponder && onSelect(opcion)}
+            onClick={() => puedeResponder && onSelect(opcion.id)}
             className="option-feedback"
             style={{
               minHeight: '54px',
@@ -101,7 +101,6 @@ export function AnswerOptions({
               fontSize: '1rem',
               textAlign: 'center',
               lineHeight: 1.3,
-              // Feedback táctil + transición de color — CSS puro
               transition:
                 'transform 80ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out, opacity 200ms ease-out',
               ...estilos,
@@ -117,13 +116,10 @@ export function AnswerOptions({
             }}
             onTouchEnd={(e) => { e.currentTarget.style.transform = 'scale(1)' }}
           >
-            {opcion}
+            {opcion.nickname}
           </button>
         )
       })}
     </div>
   )
 }
-
-// Re-export RankingItem so GameRound doesn't need an extra import
-export type { RankingItem }

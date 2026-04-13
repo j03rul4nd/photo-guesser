@@ -19,13 +19,13 @@ interface Jugador {
   puntuacion: number
   conectado: boolean
   fotosListas: boolean
+  fotosAdivinadas: number
 }
 
 interface FotoRonda {
   key: string
   propietarioId: string
   propietarioNickname: string
-  /** URL firmada generada al inicio de la ronda */
   url: string
 }
 
@@ -35,11 +35,14 @@ interface Respuesta {
   timestamp: number
 }
 
+type Opcion = { id: string; nickname: string }
+
 // ─── Server → Client event builders ──────────────────────────────────────────
 
-function lobbyUpdateEvent(jugadores: Map<string, Jugador>): string {
+function lobbyUpdateEvent(jugadores: Map<string, Jugador>, hostId: string | null): string {
   return JSON.stringify({
     type: 'LOBBY_UPDATE',
+    hostId: hostId ?? '',
     jugadores: Array.from(jugadores.values()).map((j) => ({
       id: j.id,
       nickname: j.nickname,
@@ -72,7 +75,7 @@ export class GameRoom implements DurableObject {
   private jugadores: Map<string, Jugador> = new Map()
   private connections: Map<string, WebSocket> = new Map()
 
-  // Foto pool: todas las fotos de todos los jugadores mezcladas
+  // Foto pool
   private fotosPool: FotoRonda[] = []
   private fotosUsadas: Set<string> = new Set()
 
@@ -80,8 +83,16 @@ export class GameRoom implements DurableObject {
   private totalRondas = 0
   private fotoActual: FotoRonda | null = null
   private respuestasRonda: Map<string, Respuesta> = new Map()
-  private respuestasCount = 0
   private timerHandle: ReturnType<typeof setTimeout> | null = null
+
+  // Estado para reconexión mid-game
+  private currentOpciones: Opcion[] = []
+  private roundStartTime = 0
+  private lastRoundResultJson: string | null = null
+  private lastGameEndJson: string | null = null
+
+  // Juego pausado cuando todos se desconectan
+  private gamePaused = false
 
   // DO Alarm: cleanup a los 30 min de inactividad
   private lastActivity = Date.now()
@@ -97,25 +108,13 @@ export class GameRoom implements DurableObject {
     const url = new URL(request.url)
     this.lastActivity = Date.now()
 
-    // HTTP internal routes (from the Worker router)
-    if (url.pathname === '/init' && request.method === 'POST') {
-      return this.handleInit()
-    }
-    if (url.pathname === '/join' && request.method === 'POST') {
-      return this.handleJoin(request)
-    }
-    if (url.pathname === '/auth' && request.method === 'POST') {
-      return this.handleAuth(request)
-    }
-    if (url.pathname === '/close' && request.method === 'POST') {
-      return this.handleClose()
-    }
+    if (url.pathname === '/init' && request.method === 'POST') return this.handleInit()
+    if (url.pathname === '/join' && request.method === 'POST') return this.handleJoin(request)
+    if (url.pathname === '/auth' && request.method === 'POST') return this.handleAuth(request)
+    if (url.pathname === '/close' && request.method === 'POST') return this.handleClose()
 
-    // WebSocket upgrade (from GET /api/sala/:code/ws)
     const upgradeHeader = request.headers.get('Upgrade')
-    if (upgradeHeader?.toLowerCase() === 'websocket') {
-      return this.handleWebSocket(request)
-    }
+    if (upgradeHeader?.toLowerCase() === 'websocket') return this.handleWebSocket(request)
 
     return new Response('Not found', { status: 404 })
   }
@@ -123,7 +122,6 @@ export class GameRoom implements DurableObject {
   // ─── HTTP handlers ──────────────────────────────────────────────────────────
 
   private handleInit(): Response {
-    // Schedule cleanup alarm 30 minutes from now
     void this.state.storage.setAlarm(Date.now() + 30 * 60 * 1000)
     return new Response('OK', { status: 200 })
   }
@@ -131,60 +129,60 @@ export class GameRoom implements DurableObject {
   private async handleJoin(request: Request): Promise<Response> {
     const { jugadorId, nickname } = await request.json() as { jugadorId: string; nickname: string }
 
-    // State checks
-    if (this.estado === 'round_showing' || this.estado === 'round_results') {
+    // Bloquear nuevas uniones durante juego activo o transición
+    const estadosBloqueados: RoomState[] = ['round_showing', 'round_results', 'game_over', 'resetting']
+    if (estadosBloqueados.includes(this.estado)) {
+      const code = this.estado === 'game_over' ? ERROR_CODES.GAME_ALREADY_STARTED : ERROR_CODES.GAME_ALREADY_STARTED
+      console.log(`[JOIN] rechazado — estado=${this.estado} jugadorId=${jugadorId}`)
       return new Response(
-        JSON.stringify({ code: ERROR_CODES.GAME_ALREADY_STARTED, error: ERROR_MESSAGES.GAME_ALREADY_STARTED }),
+        JSON.stringify({ code, error: ERROR_MESSAGES[code] }),
         { status: 409 },
       )
     }
+
     if (this.jugadores.size >= 10) {
+      console.log(`[JOIN] rechazado — sala llena. jugadorId=${jugadorId}`)
       return new Response(
         JSON.stringify({ code: ERROR_CODES.ROOM_FULL, error: ERROR_MESSAGES.ROOM_FULL }),
         { status: 409 },
       )
     }
 
-    // Si el jugador ya existe (reconexión), solo actualizar conectado
+    // Si el jugador ya existe (reconexión HTTP antes de abrir WS)
     const existing = this.jugadores.get(jugadorId)
     if (existing) {
-      existing.conectado = true
-      this.broadcast(lobbyUpdateEvent(this.jugadores))
+      console.log(`[JOIN] re-join HTTP. jugadorId=${jugadorId} nickname=${nickname}`)
+      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
       return new Response('OK', { status: 200 })
     }
 
-    // Nuevo jugador
     const jugador: Jugador = {
       id: jugadorId,
       nickname,
       fotoKeys: [],
       puntuacion: 0,
-      conectado: false, // se marcará true cuando abra el WS
+      conectado: false,
       fotosListas: false,
+      fotosAdivinadas: 0,
     }
 
     this.jugadores.set(jugadorId, jugador)
-
-    // El primero en unirse es el host
     if (!this.host) this.host = jugadorId
 
-    this.broadcast(lobbyUpdateEvent(this.jugadores))
+    console.log(`[JOIN] nuevo jugador. jugadorId=${jugadorId} nickname=${nickname} host=${this.host} total=${this.jugadores.size}`)
+    this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
     return new Response('OK', { status: 200 })
   }
 
   private async handleAuth(request: Request): Promise<Response> {
     const { jugadorId } = await request.json() as { jugadorId: string }
-    if (!this.jugadores.has(jugadorId)) {
-      return new Response('Unauthorized', { status: 403 })
-    }
+    if (!this.jugadores.has(jugadorId)) return new Response('Unauthorized', { status: 403 })
     return new Response('OK', { status: 200 })
   }
 
   private handleClose(): Response {
     this.clearTimer()
-    // Notificar a todos los conectados
     this.broadcastRaw(JSON.stringify({ type: 'ROOM_CLOSED' }))
-    // Cerrar todas las conexiones
     for (const ws of this.connections.values()) {
       try { ws.close(1001, 'Room closed') } catch { /* ignore */ }
     }
@@ -203,39 +201,121 @@ export class GameRoom implements DurableObject {
 
     server.accept()
 
+    // Si ya había una conexión anterior del mismo jugador, cerrarla limpiamente
+    const prevWs = this.connections.get(jugadorId)
+    if (prevWs) {
+      try { prevWs.close(1000, 'Replaced by new connection') } catch { /* ignore */ }
+    }
     this.connections.set(jugadorId, server)
 
-    // Mark player as connected
     const jugador = this.jugadores.get(jugadorId)
     if (jugador) {
       jugador.conectado = true
-      // Notify reconnection if was disconnected
-      const wasDisconnected = !jugador.conectado
-      if (wasDisconnected) {
-        this.broadcast(JSON.stringify({ type: 'PLAYER_RECONNECTED', jugadorId }))
+
+      // Si no hay host activo (todos se habían desconectado), promover al primero que vuelva
+      if (!this.host) {
+        this.host = jugadorId
+        console.log(`[WS] sin host previo — promoviendo a ${jugador.nickname} como nuevo host`)
+        this.broadcast(JSON.stringify({ type: 'HOST_CHANGED', newHostId: jugadorId }))
       }
-      this.broadcast(lobbyUpdateEvent(this.jugadores))
+
+      console.log(`[WS] conectado. jugadorId=${jugadorId} nickname=${jugador.nickname} estado=${this.estado} paused=${this.gamePaused}`)
+
+      // Enviar estado actual del lobby a todos
+      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+
+      // Si el juego ya empezó, reenviar estado al jugador que (re)conecta
+      const enPartida: RoomState[] = ['round_showing', 'round_results', 'game_over']
+      if (enPartida.includes(this.estado) || this.gamePaused) {
+        void this.sendCurrentGameState(server, jugadorId)
+      }
+    } else {
+      console.log(`[WS] WARN: jugadorId=${jugadorId} no encontrado en la sala`)
+      // Igualmente enviar lobby state para que el cliente tenga contexto
+      server.send(lobbyUpdateEvent(this.jugadores, this.host))
     }
 
     server.addEventListener('message', (event) => {
       void this.handleMessage(jugadorId, event.data as string)
     })
 
+    // Usar `server` capturado en el closure para verificar que esta WS
+    // sigue siendo la activa antes de procesar la desconexión.
+    // Sin esta comprobación, el close de la conexión *anterior* (reemplazada)
+    // borraría la *nueva* entrada de connections.
     server.addEventListener('close', () => {
-      this.handleDisconnect(jugadorId)
+      if (this.connections.get(jugadorId) === server) {
+        this.handleDisconnect(jugadorId)
+      }
     })
 
     server.addEventListener('error', () => {
-      this.handleDisconnect(jugadorId)
+      if (this.connections.get(jugadorId) === server) {
+        this.handleDisconnect(jugadorId)
+      }
     })
 
-    // Send current lobby state immediately on connect
-    server.send(lobbyUpdateEvent(this.jugadores))
-
-    // Reset alarm on activity
     void this.state.storage.setAlarm(Date.now() + 30 * 60 * 1000)
 
     return new Response(null, { status: 101, webSocket: client })
+  }
+
+  // ─── Enviar estado del juego al reconectar ──────────────────────────────────
+
+  private async sendCurrentGameState(ws: WebSocket, jugadorId: string): Promise<void> {
+    const safeSend = (msg: string) => { try { ws.send(msg) } catch { /* ignore */ } }
+
+    // Siempre informar cuántas rondas hay en total
+    safeSend(JSON.stringify({ type: 'GAME_START', totalRondas: this.totalRondas }))
+
+    if (this.estado === 'round_showing' || (this.gamePaused && this.fotoActual)) {
+      if (!this.fotoActual) return
+
+      const elapsedMs = Date.now() - this.roundStartTime
+      // Si el juego estaba pausado, dar tiempo completo; si no, dar el tiempo restante
+      const timerMs = this.gamePaused
+        ? 15000
+        : Math.max(3000, 15000 - elapsedMs) // mínimo 3s para que tenga tiempo de responder
+
+      safeSend(JSON.stringify({
+        type: 'ROUND_START',
+        rondaNum: this.rondaActual,
+        fotoUrl: this.getSignedUrl(this.fotoActual.key),
+        opciones: this.currentOpciones,
+        timerMs,
+      }))
+
+      // Si el juego estaba pausado, reanudarlo ahora que hay alguien conectado
+      if (this.gamePaused) {
+        console.log(`[RESUME] jugadorId=${jugadorId} se reconectó — reanudando juego`)
+        this.gamePaused = false
+        this.roundStartTime = Date.now()
+        this.timerHandle = setTimeout(() => {
+          void this.resolveRound()
+        }, timerMs)
+      }
+
+    } else if (this.estado === 'round_results') {
+      // Reenviar el último resultado de ronda
+      if (this.lastRoundResultJson) safeSend(this.lastRoundResultJson)
+
+      // Si estaba pausado tras results, avanzar a siguiente ronda
+      if (this.gamePaused) {
+        this.gamePaused = false
+        console.log(`[RESUME] jugadorId=${jugadorId} se reconectó en round_results — avanzando`)
+        await new Promise((r) => setTimeout(r, 2000))
+        if (this.connections.size > 0) {
+          if (this.fotosUsadas.size >= this.fotosPool.length) {
+            await this.endGame()
+          } else {
+            await this.nextRound()
+          }
+        }
+      }
+
+    } else if (this.estado === 'game_over') {
+      if (this.lastGameEndJson) safeSend(this.lastGameEndJson)
+    }
   }
 
   // ─── Message handler ────────────────────────────────────────────────────────
@@ -245,7 +325,10 @@ export class GameRoom implements DurableObject {
     try { parsed = JSON.parse(raw) } catch { return }
 
     const result = ClientWSEventSchema.safeParse(parsed)
-    if (!result.success) return
+    if (!result.success) {
+      console.log(`[MSG] parse error jugadorId=${jugadorId}: ${result.error.issues[0]?.message ?? 'unknown'}`)
+      return
+    }
 
     const event = result.data
     const jugador = this.jugadores.get(jugadorId)
@@ -253,33 +336,51 @@ export class GameRoom implements DurableObject {
 
     switch (event.type) {
       case 'JOIN': {
-        // WebSocket JOIN — update nickname if needed, send current state
         jugador.nickname = event.nickname
-        this.broadcast(lobbyUpdateEvent(this.jugadores))
+        this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
         break
       }
 
       case 'FOTOS_READY': {
+        // No actualizar fotos si la partida ya está en curso
+        if (this.estado !== 'waiting' && this.estado !== 'lobby_ready') {
+          console.log(`[FOTOS_READY] ignorado — estado=${this.estado}`)
+          break
+        }
         jugador.fotoKeys = event.fotoKeys
         jugador.fotosListas = true
-        this.broadcast(lobbyUpdateEvent(this.jugadores))
 
-        // Check if all ready
         const listos = Array.from(this.jugadores.values()).filter((j) => j.fotosListas && j.conectado)
-        if (listos.length >= 2) {
+        console.log(`[FOTOS_READY] jugadorId=${jugadorId} fotos=${event.fotoKeys.length} listos=${listos.length}/${this.jugadores.size}`)
+
+        this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+
+        if (listos.length >= 2 && this.estado === 'waiting') {
           this.estado = 'lobby_ready'
-          this.broadcast(lobbyUpdateEvent(this.jugadores))
+          console.log(`[FOTOS_READY] estado → lobby_ready`)
+          this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
         }
         break
       }
 
       case 'START_GAME': {
+        console.log(`[START_GAME] jugadorId=${jugadorId} host=${this.host} estado=${this.estado}`)
         if (jugadorId !== this.host) {
           this.sendTo(jugadorId, errorEvent('UNAUTHORIZED'))
           return
         }
-        if (this.estado !== 'lobby_ready') return
-
+        if (this.estado !== 'lobby_ready') {
+          console.log(`[START_GAME] rechazado — estado=${this.estado}`)
+          return
+        }
+        // Validar que aún hay al menos 2 jugadores conectados con fotos
+        const listos = Array.from(this.jugadores.values()).filter((j) => j.fotosListas && j.conectado)
+        if (listos.length < 2) {
+          console.log(`[START_GAME] rechazado — solo ${listos.length} jugadores listos`)
+          this.estado = 'waiting'
+          this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+          return
+        }
         await this.startGame()
         break
       }
@@ -287,9 +388,7 @@ export class GameRoom implements DurableObject {
       case 'ANSWER': {
         if (this.estado !== 'round_showing') return
         if (!this.fotoActual) return
-        // El dueño de la foto no puede responder
         if (this.fotoActual.propietarioId === jugadorId) return
-        // Solo una respuesta por jugador por ronda
         if (this.respuestasRonda.has(jugadorId)) return
 
         this.respuestasRonda.set(jugadorId, {
@@ -297,19 +396,22 @@ export class GameRoom implements DurableObject {
           tiempoMs: event.tiempoMs,
           timestamp: Date.now(),
         })
-        this.respuestasCount++
 
-        // Notificar al propietario cuántos han respondido
+        console.log(`[ANSWER] jugadorId=${jugadorId} respuesta=${event.propietarioId} correcto=${event.propietarioId === this.fotoActual.propietarioId}`)
+
+        // totalQueResponden = jugadores conectados que NO son el propietario
+        const totalQueResponden = this.calcTotalQueResponden()
+
+        // Notificar al propietario
         const owner = this.fotoActual.propietarioId
-        const totalQueResponden = this.jugadores.size - 1 // todos menos el dueño
         this.sendTo(owner, JSON.stringify({
           type: 'PLAYER_RESPONSE_COUNT',
-          count: this.respuestasCount,
+          count: this.respuestasRonda.size,
           total: totalQueResponden,
         }))
 
-        // Si todos respondieron, adelantar el resultado
-        if (this.respuestasCount >= totalQueResponden) {
+        // Si todos los conectados respondieron, adelantar
+        if (this.respuestasRonda.size >= totalQueResponden) {
           this.clearTimer()
           void this.resolveRound()
         }
@@ -329,10 +431,14 @@ export class GameRoom implements DurableObject {
 
   private async startGame(): Promise<void> {
     this.estado = 'round_showing'
+    this.gamePaused = false
+    this.lastRoundResultJson = null
+    this.lastGameEndJson = null
 
-    // Build foto pool: all fotos from all players, shuffled
     this.fotosPool = []
     for (const jugador of this.jugadores.values()) {
+      // Solo incluir fotos de jugadores con fotosListas
+      if (!jugador.fotosListas) continue
       for (const key of jugador.fotoKeys) {
         this.fotosPool.push({
           key,
@@ -353,15 +459,18 @@ export class GameRoom implements DurableObject {
     this.rondaActual = 0
     this.fotosUsadas.clear()
 
+    console.log(`[startGame] totalFotos=${this.fotosPool.length} jugadores=${this.jugadores.size}`)
+
     this.broadcast(JSON.stringify({ type: 'GAME_START', totalRondas: this.totalRondas }))
 
-    // Small delay before first round
     await new Promise((r) => setTimeout(r, 1000))
     await this.nextRound()
   }
 
   private async nextRound(): Promise<void> {
-    // Find next unused foto
+    // No avanzar si el juego fue pausado mientras se ejecutaba esta cadena
+    if (this.gamePaused) return
+
     const disponibles = this.fotosPool.filter((f) => !this.fotosUsadas.has(f.key))
     if (disponibles.length === 0) {
       await this.endGame()
@@ -373,30 +482,34 @@ export class GameRoom implements DurableObject {
     this.fotoActual = foto
     this.rondaActual++
     this.respuestasRonda.clear()
-    this.respuestasCount = 0
     this.estado = 'round_showing'
 
-    // Build answer options: propietario + 3 random other nicknames
-    const otrosNicknames = Array.from(this.jugadores.values())
+    // Opciones: propietario + hasta 3 distractores (con id y nickname)
+    const otrosJugadores = Array.from(this.jugadores.values())
       .filter((j) => j.id !== foto.propietarioId)
-      .map((j) => j.nickname)
 
-    // Shuffle and pick up to 3 distractors
-    for (let i = otrosNicknames.length - 1; i > 0; i--) {
+    for (let i = otrosJugadores.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
-      ;[otrosNicknames[i], otrosNicknames[j]] = [otrosNicknames[j]!, otrosNicknames[i]!]
+      ;[otrosJugadores[i], otrosJugadores[j]] = [otrosJugadores[j]!, otrosJugadores[i]!]
     }
-    const distractors = otrosNicknames.slice(0, 3)
-    const opciones = [foto.propietarioNickname, ...distractors]
+    const distractors = otrosJugadores.slice(0, 3)
 
-    // Shuffle options
+    const opciones: Opcion[] = [
+      { id: foto.propietarioId, nickname: foto.propietarioNickname },
+      ...distractors.map((j) => ({ id: j.id, nickname: j.nickname })),
+    ]
+
     for (let i = opciones.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
       ;[opciones[i], opciones[j]] = [opciones[j]!, opciones[i]!]
     }
 
-    // Refresh signed URL for this round
+    // Guardar para reenviar a jugadores que reconecten
+    this.currentOpciones = opciones
+    this.roundStartTime = Date.now()
     foto.url = this.getSignedUrl(foto.key)
+
+    console.log(`[ROUND_START] ronda=${this.rondaActual}/${this.totalRondas} propietario=${foto.propietarioNickname} opciones=[${opciones.map((o) => o.nickname).join(', ')}]`)
 
     this.broadcast(JSON.stringify({
       type: 'ROUND_START',
@@ -406,7 +519,13 @@ export class GameRoom implements DurableObject {
       timerMs: 15000,
     }))
 
-    // Start 15s timer
+    // Si no hay nadie conectado, pausar inmediatamente
+    if (this.connections.size === 0) {
+      console.log(`[nextRound] sin conexiones — pausando juego`)
+      this.gamePaused = true
+      return
+    }
+
     this.timerHandle = setTimeout(() => {
       void this.resolveRound()
     }, 15000)
@@ -415,13 +534,14 @@ export class GameRoom implements DurableObject {
   private async resolveRound(): Promise<void> {
     this.clearTimer()
     if (!this.fotoActual) return
+    // Guard doble llamada (timer + última respuesta simultáneos)
+    if (this.estado === 'round_results') return
     this.estado = 'round_results'
 
     const foto = this.fotoActual
     const puntosGanados: Record<string, number> = {}
     const respuestasCorrectas: string[] = []
 
-    // Calculate scores
     for (const [jugadorId, respuesta] of this.respuestasRonda.entries()) {
       const acierto = respuesta.propietarioId === foto.propietarioId
       if (acierto) {
@@ -429,11 +549,15 @@ export class GameRoom implements DurableObject {
         puntosGanados[jugadorId] = puntos
         respuestasCorrectas.push(jugadorId)
         const jugador = this.jugadores.get(jugadorId)
-        if (jugador) jugador.puntuacion += puntos
+        if (jugador) {
+          jugador.puntuacion += puntos
+          jugador.fotosAdivinadas++
+        }
       }
     }
 
-    // Build ranking for this round
+    console.log(`[ROUND_RESULT] ronda=${this.rondaActual} correctas=${respuestasCorrectas.length}`)
+
     const rankingRonda = Array.from(this.jugadores.values())
       .map((j) => ({
         id: j.id,
@@ -443,17 +567,28 @@ export class GameRoom implements DurableObject {
       }))
       .sort((a, b) => b.puntosTotal - a.puntosTotal)
 
-    this.broadcast(JSON.stringify({
+    const roundResultMsg = JSON.stringify({
       type: 'ROUND_RESULT',
       propietarioId: foto.propietarioId,
       propietarioNickname: foto.propietarioNickname,
       respuestasCorrectas,
       puntosGanados,
       rankingRonda,
-    }))
+    })
 
-    // Pause 3s then next round
+    // Guardar para reenviar a reconectados
+    this.lastRoundResultJson = roundResultMsg
+    this.broadcast(roundResultMsg)
+
+    // Pausa 3s entre rondas
     await new Promise((r) => setTimeout(r, 3000))
+
+    // Si todos se desconectaron durante el resultado, pausar
+    if (this.connections.size === 0) {
+      console.log(`[resolveRound] sin conexiones tras resultados — juego pausado`)
+      this.gamePaused = true
+      return
+    }
 
     if (this.fotosUsadas.size >= this.fotosPool.length) {
       await this.endGame()
@@ -471,21 +606,26 @@ export class GameRoom implements DurableObject {
         id: j.id,
         nickname: j.nickname,
         puntosTotal: j.puntuacion,
-        fotosAdivinadas: 0, // TODO: track this per player
+        fotosAdivinadas: j.fotosAdivinadas,
       }))
       .sort((a, b) => b.puntosTotal - a.puntosTotal)
 
-    this.broadcast(JSON.stringify({ type: 'GAME_END', rankingFinal }))
+    console.log(`[GAME_END] ganador=${rankingFinal[0]?.nickname ?? 'nadie'} rondas=${this.rondaActual}`)
+
+    const gameEndMsg = JSON.stringify({ type: 'GAME_END', rankingFinal })
+    this.lastGameEndJson = gameEndMsg
+    this.broadcast(gameEndMsg)
   }
 
   private async resetGame(): Promise<void> {
     this.estado = 'resetting'
+    this.clearTimer()
 
-    // Reset all player scores and foto state
     for (const jugador of this.jugadores.values()) {
       jugador.puntuacion = 0
       jugador.fotoKeys = []
       jugador.fotosListas = false
+      jugador.fotosAdivinadas = 0
     }
 
     this.fotosPool = []
@@ -493,21 +633,27 @@ export class GameRoom implements DurableObject {
     this.rondaActual = 0
     this.fotoActual = null
     this.respuestasRonda.clear()
-    this.respuestasCount = 0
+    this.currentOpciones = []
+    this.roundStartTime = 0
+    this.lastRoundResultJson = null
+    this.lastGameEndJson = null
+    this.gamePaused = false
     this.estado = 'waiting'
 
     this.broadcast(JSON.stringify({ type: 'GAME_RESET' }))
-    this.broadcast(lobbyUpdateEvent(this.jugadores))
+    this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
   }
 
   // ─── Disconnect handling ────────────────────────────────────────────────────
 
   private handleDisconnect(jugadorId: string): void {
     this.connections.delete(jugadorId)
+
     const jugador = this.jugadores.get(jugadorId)
     if (!jugador) return
 
     jugador.conectado = false
+    console.log(`[WS] desconectado. jugadorId=${jugadorId} nickname=${jugador.nickname} conexiones=${this.connections.size}`)
 
     this.broadcast(JSON.stringify({
       type: 'PLAYER_DISCONNECTED',
@@ -515,43 +661,84 @@ export class GameRoom implements DurableObject {
       nickname: jugador.nickname,
     }))
 
-    // If host disconnected, pass host to next connected player
+    // Pasar host al siguiente jugador conectado si el host se fue
     if (jugadorId === this.host) {
       const nextHost = Array.from(this.jugadores.values()).find(
         (j) => j.conectado && j.id !== jugadorId,
       )
       if (nextHost) {
         this.host = nextHost.id
+        console.log(`[HOST_CHANGED] nuevo host: ${nextHost.nickname}`)
         this.broadcast(JSON.stringify({ type: 'HOST_CHANGED', newHostId: nextHost.id }))
+      } else {
+        // Nadie más conectado — el host quedará pendiente para el próximo que reconecte
+        this.host = null
       }
     }
 
-    this.broadcast(lobbyUpdateEvent(this.jugadores))
-  }
+    // ── Gestión de estado según la fase del juego ────────────────────────────
 
-  // ─── DO Alarm — cleanup después de 30 min de inactividad ───────────────────
-
-  async alarm(): Promise<void> {
-    const inactivoMs = Date.now() - this.lastActivity
-    if (inactivoMs >= 30 * 60 * 1000) {
-      // Cerrar todas las conexiones
-      for (const ws of this.connections.values()) {
-        try { ws.close(1001, 'Inactivity timeout') } catch { /* ignore */ }
+    if (this.estado === 'waiting' || this.estado === 'lobby_ready') {
+      // Re-verificar si aún se cumplen los requisitos mínimos
+      const listos = Array.from(this.jugadores.values()).filter((j) => j.fotosListas && j.conectado)
+      if (listos.length < 2 && this.estado === 'lobby_ready') {
+        console.log(`[DISCONNECT] lobby_ready → waiting (solo ${listos.length} listos)`)
+        this.estado = 'waiting'
       }
-      this.connections.clear()
-      // Las fotos en R2 se borran desde el Worker vía DELETE /api/sala/:code
-      // En un sistema completo llamaríamos al Worker aquí; por ahora solo cerramos
+      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+
+    } else if (this.estado === 'round_showing') {
+      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+
+      if (this.connections.size === 0) {
+        // Todos se desconectaron — pausar para no desperdiciar recursos
+        this.clearTimer()
+        this.gamePaused = true
+        console.log(`[PAUSE] todos desconectados en round_showing — timer cancelado`)
+      } else {
+        // Re-evaluar si los que quedan conectados ya respondieron todos
+        const totalQueResponden = this.calcTotalQueResponden()
+        if (totalQueResponden > 0 && this.respuestasRonda.size >= totalQueResponden) {
+          console.log(`[DISCONNECT] todos los conectados respondieron — adelantando ronda`)
+          this.clearTimer()
+          void this.resolveRound()
+        } else if (totalQueResponden === 0) {
+          // Solo queda el propietario conectado — avanzar automáticamente
+          console.log(`[DISCONNECT] solo el propietario conectado — resolviendo`)
+          this.clearTimer()
+          void this.resolveRound()
+        }
+      }
+
+    } else if (this.estado === 'round_results') {
+      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+      if (this.connections.size === 0) {
+        this.gamePaused = true
+        console.log(`[PAUSE] todos desconectados en round_results`)
+      }
+
     } else {
-      // Reschedule
-      await this.state.storage.setAlarm(Date.now() + 30 * 60 * 1000)
+      // game_over, resetting: solo actualizar lobby
+      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
     }
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
+  /**
+   * Calcula cuántos jugadores conectados deben responder en esta ronda
+   * (todos los conectados excepto el propietario de la foto)
+   */
+  private calcTotalQueResponden(): number {
+    if (!this.fotoActual) return 0
+    const ownerConnected = this.connections.has(this.fotoActual.propietarioId)
+    const conectados = this.connections.size
+    return ownerConnected ? conectados - 1 : conectados
+  }
+
   private broadcast(message: string): void {
     for (const [, ws] of this.connections) {
-      try { ws.send(message) } catch { /* ignore closed connections */ }
+      try { ws.send(message) } catch { /* ignore */ }
     }
   }
 
@@ -561,9 +748,7 @@ export class GameRoom implements DurableObject {
 
   private sendTo(jugadorId: string, message: string): void {
     const ws = this.connections.get(jugadorId)
-    if (ws) {
-      try { ws.send(message) } catch { /* ignore */ }
-    }
+    if (ws) try { ws.send(message) } catch { /* ignore */ }
   }
 
   private clearTimer(): void {
@@ -574,8 +759,21 @@ export class GameRoom implements DurableObject {
   }
 
   private getSignedUrl(key: string): string {
-    // Las fotos se sirven via GET /api/foto/:key desde el Worker
-    // No hay TTL aquí — el Worker valida acceso si hace falta
     return `/api/foto/${encodeURIComponent(key)}`
+  }
+
+  // ─── DO Alarm — cleanup ───────────────────────────────────────────────────
+
+  async alarm(): Promise<void> {
+    const inactivoMs = Date.now() - this.lastActivity
+    if (inactivoMs >= 30 * 60 * 1000) {
+      console.log(`[ALARM] sala inactiva ${Math.round(inactivoMs / 60000)} min — cerrando`)
+      for (const ws of this.connections.values()) {
+        try { ws.close(1001, 'Inactivity timeout') } catch { /* ignore */ }
+      }
+      this.connections.clear()
+    } else {
+      await this.state.storage.setAlarm(Date.now() + 30 * 60 * 1000)
+    }
   }
 }

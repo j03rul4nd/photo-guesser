@@ -61,11 +61,11 @@ export function GameRound({ miId, onAnswer, onTimerExpire, startTimeRef }: GameR
   }, [])
 
   const handleSelect = useCallback(
-    (opcion: string) => {
+    (jugadorId: string) => {
       if (faseRonda !== 'showing' || respuestaSeleccionada) return
       const tiempoMs = Date.now() - startTimeRef.current
-      useJuegoStore.getState().setRespuesta(opcion)
-      onAnswer(opcion, tiempoMs)
+      useJuegoStore.getState().setRespuesta(jugadorId)
+      onAnswer(jugadorId, tiempoMs)
     },
     [faseRonda, respuestaSeleccionada, startTimeRef, onAnswer],
   )
@@ -89,7 +89,7 @@ export function GameRound({ miId, onAnswer, onTimerExpire, startTimeRef }: GameR
           Ronda <AnimatedNumber value={fotoActual.rondaNum} /> / <AnimatedNumber value={fotoActual.totalRondas} />
         </span>
         {showGame && !esMiFoto && (
-          <Timer duracionMs={15000} activo={faseRonda === 'showing'} onExpire={onTimerExpire} />
+          <Timer duracionMs={fotoActual.timerMs} activo={faseRonda === 'showing'} onExpire={onTimerExpire} />
         )}
       </header>
 
@@ -141,7 +141,7 @@ export function GameRound({ miId, onAnswer, onTimerExpire, startTimeRef }: GameR
               <AnswerOptions
                 opciones={fotoActual.opciones}
                 seleccionada={respuestaSeleccionada}
-                correctas={respuestasCorrectas}
+                correcta={propietarioNickname ?? ''}
                 faseRonda={faseRonda === 'idle' ? 'showing' : faseRonda}
                 onSelect={handleSelect}
               />

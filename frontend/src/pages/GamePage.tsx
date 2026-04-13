@@ -24,6 +24,8 @@ export function GamePage() {
     setRespuestaCount,
     setRoundResult,
     setGameOver,
+    setTotalRondasPartida,
+    totalRondasPartida,
     reset,
     fotoActual,
     gameOver,
@@ -41,18 +43,23 @@ export function GamePage() {
 
   const processEvent = (event: ServerWSEvent) => {
     switch (event.type) {
+      case 'GAME_START':
+        // Guardar el total real de rondas para mostrarlo correctamente en el header
+        setTotalRondasPartida(event.totalRondas)
+        break
       case 'ROUND_START': {
-        const miNickname = sessionStorage.getItem('pg_nickname') ?? ''
-        // Si el único nombre en las opciones que NO es el nuestro existe → no es nuestra foto
-        // Si nuestro nickname no aparece en las opciones → el servidor nos lo mandó como dueño
-        const esMiFoto = !event.opciones.includes(miNickname)
+        // esMiFoto: el servidor NO incluye al dueño entre las opciones de respuesta;
+        // si mi ID no está en opciones → esta foto es mía
+        const esMiFoto = !event.opciones.some((o) => o.id === jugadorId)
         startTimeRef.current = Date.now()
         setFotoActual(
           {
             url: event.fotoUrl,
             opciones: event.opciones,
             rondaNum: event.rondaNum,
-            totalRondas: Math.max(jugadores.length * 10, event.rondaNum),
+            // Usar el totalRondas del GAME_START; como fallback usamos el del store
+            totalRondas: totalRondasPartida > 0 ? totalRondasPartida : event.rondaNum,
+            timerMs: event.timerMs,
           },
           esMiFoto,
         )
@@ -80,6 +87,10 @@ export function GamePage() {
             ? `/sala/${event.nuevoCodigo}/lobby`
             : `/sala/${code}/lobby`,
         )
+        break
+      case 'ROOM_CLOSED':
+        reset()
+        navigate('/')
         break
     }
   }

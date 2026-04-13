@@ -33,6 +33,7 @@ export type FinalRankingItem = z.infer<typeof FinalRankingItemSchema>
 export const ServerWSEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('LOBBY_UPDATE'),
+    hostId: z.string(),
     jugadores: z.array(JugadorSchema),
   }),
   z.object({
@@ -42,8 +43,8 @@ export const ServerWSEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('ROUND_START'),
     rondaNum: z.number().int().positive(),
-    fotoUrl: z.string().url(),
-    opciones: z.array(z.string()),
+    fotoUrl: z.string(), // URL relativa (/api/foto/...) — no usar z.string().url()
+    opciones: z.array(z.object({ id: z.string(), nickname: z.string() })),
     timerMs: z.number().int().positive(),
   }),
   // v3.1: only emitted to the photo owner
@@ -86,6 +87,9 @@ export const ServerWSEventSchema = z.discriminatedUnion('type', [
     type: z.literal('ERROR'),
     code: z.string(),
     message: z.string(),
+  }),
+  z.object({
+    type: z.literal('ROOM_CLOSED'),
   }),
 ])
 

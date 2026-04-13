@@ -24,6 +24,7 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
   const wsRef = useRef<WebSocket | null>(null)
   const attemptRef = useRef(0)
   const unmountedRef = useRef(false)
+  const roomClosedRef = useRef(false)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const connect = useCallback(() => {
@@ -56,9 +57,15 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
       // Actualizar estado local según tipo de evento
       if (msg.type === 'LOBBY_UPDATE') {
         setJugadores(msg.jugadores)
+        if (msg.hostId) setHostId(msg.hostId)
       }
       if (msg.type === 'HOST_CHANGED') {
         setHostId(msg.newHostId)
+      }
+      if (msg.type === 'ROOM_CLOSED') {
+        // Sala cerrada definitivamente — no reconectar
+        roomClosedRef.current = true
+        ws.close()
       }
     }
 
@@ -66,6 +73,9 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
       if (unmountedRef.current) return
       setEstado('disconnected')
       wsRef.current = null
+
+      // No reconectar si la sala fue cerrada definitivamente
+      if (roomClosedRef.current) return
 
       // Reconexión con backoff exponencial
       const delay = BACKOFF_MS[Math.min(attemptRef.current, BACKOFF_MS.length - 1)] ?? 10000
@@ -82,6 +92,7 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
 
   useEffect(() => {
     unmountedRef.current = false
+    roomClosedRef.current = false
     connect()
 
     return () => {

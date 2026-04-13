@@ -45,6 +45,7 @@ export function LobbyPage() {
   const handleServerEvent = (event: ServerWSEvent) => {
     if (event.type === 'GAME_START') navigate(`/sala/${code}/juego`)
     if (event.type === 'HOST_CHANGED') setHostId(event.newHostId)
+    if (event.type === 'ROOM_CLOSED') navigate('/')
   }
 
   const [copied, setCopied] = useState(false)
