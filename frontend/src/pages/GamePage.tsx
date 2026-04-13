@@ -32,10 +32,17 @@ export function GamePage() {
     rankingFinal,
   } = useJuegoStore()
 
-  const { jugadores, sendMessage, lastEvent, hostId: wsHostId } = useGameSocket(code, jugadorId)
+  const { jugadores, closedReason, sendMessage, lastEvent, hostId: wsHostId } = useGameSocket(code, jugadorId)
   const startTimeRef = useRef<number>(Date.now())
   const isHost = jugadorId === wsHostId
   const [showAbortConfirm, setShowAbortConfirm] = useState(false)
+
+  // Si el jugador fue rechazado (no en sala), redirigir al inicio
+  useEffect(() => {
+    if (!closedReason) return
+    reset()
+    navigate(closedReason === 'rejected' ? '/' : '/')
+  }, [closedReason, navigate, reset])
 
   useEffect(() => {
     if (!lastEvent) return

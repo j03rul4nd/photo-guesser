@@ -5,8 +5,15 @@ import { getWsUrl } from '@/lib/api'
 
 type ConexionEstado = 'connecting' | 'connected' | 'disconnected' | 'reconnecting'
 
+/** Por qué se cerró la conexión sin posibilidad de reconectar */
+type ClosedReason =
+  | null           // normal — puede reconectar o aún conectando
+  | 'rejected'     // 1008: el jugador no está registrado en la sala
+  | 'room_closed'  // ROOM_CLOSED event o 1001: sala cerrada por el servidor/host
+
 interface UseGameSocketReturn {
   estado: ConexionEstado
+  closedReason: ClosedReason
   jugadores: Jugador[]
   hostId: string | null
   sendMessage: (msg: ClientWSEvent) => void
@@ -17,6 +24,7 @@ const BACKOFF_MS = [1000, 2000, 4000, 8000, 10000]
 
 export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocketReturn {
   const [estado, setEstado] = useState<ConexionEstado>('connecting')
+  const [closedReason, setClosedReason] = useState<ClosedReason>(null)
   const [jugadores, setJugadores] = useState<Jugador[]>([])
   const [hostId, setHostId] = useState<string | null>(null)
   const [lastEvent, setLastEvent] = useState<ServerWSEvent | null>(null)
@@ -69,15 +77,38 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
       }
     }
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       if (unmountedRef.current) return
+
+      // Si ya hay otra WS activa (p.ej. reconexión que ganó la carrera),
+      // ignorar el close de la WS reemplazada para no anular el estado correcto.
+      if (wsRef.current !== null && wsRef.current !== ws) return
+
       setEstado('disconnected')
       wsRef.current = null
 
-      // No reconectar si la sala fue cerrada definitivamente
-      if (roomClosedRef.current) return
+      // No reconectar si ya teníamos una razón de cierre
+      if (roomClosedRef.current) {
+        // ROOM_CLOSED mensaje ya procesado — notificar si no lo habíamos hecho
+        setClosedReason((prev) => prev ?? 'room_closed')
+        return
+      }
 
-      // Reconexión con backoff exponencial
+      // 1008 = Policy Violation: jugador no en sala / no autorizado
+      if (event.code === 1008) {
+        roomClosedRef.current = true
+        setClosedReason('rejected')
+        return
+      }
+
+      // 1001 = Going Away: sala cerrada activamente por el servidor
+      if (event.code === 1001) {
+        roomClosedRef.current = true
+        setClosedReason('room_closed')
+        return
+      }
+
+      // Reconexión con backoff exponencial para desconexiones transitorias
       const delay = BACKOFF_MS[Math.min(attemptRef.current, BACKOFF_MS.length - 1)] ?? 10000
       attemptRef.current++
       reconnectTimerRef.current = setTimeout(() => {
@@ -93,6 +124,7 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
   useEffect(() => {
     unmountedRef.current = false
     roomClosedRef.current = false
+    setClosedReason(null)
     connect()
 
     return () => {
@@ -114,5 +146,5 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
     }
   }, [])
 
-  return { estado, jugadores, hostId, sendMessage, lastEvent }
+  return { estado, closedReason, jugadores, hostId, sendMessage, lastEvent }
 }

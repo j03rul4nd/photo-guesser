@@ -35,9 +35,24 @@ export function LobbyPage() {
   }, [code, jugadorId, nickname, storedCode, setSala, navigate])
 
   // ── Fuente única de verdad para jugadores y host ──────────────────────────
-  const { estado, jugadores, hostId, sendMessage, lastEvent } = useGameSocket(code, jugadorId)
+  const { estado, closedReason, jugadores, hostId, sendMessage, lastEvent } = useGameSocket(code, jugadorId)
 
   const isHost = Boolean(jugadorId && hostId && jugadorId === hostId)
+
+  // ── Reaccionar al motivo de cierre de WS ─────────────────────────────────
+  useEffect(() => {
+    if (!closedReason) return
+    if (closedReason === 'rejected') {
+      // El jugador no está en esta sala: limpiar sesión y redirigir a la entrada
+      sessionStorage.removeItem('pg_jugador_id')
+      sessionStorage.removeItem('pg_nickname')
+      sessionStorage.removeItem('pg_sala_code')
+      navigate(`/sala/${code}`)
+    } else {
+      // room_closed: sala terminó, volver al inicio
+      navigate('/')
+    }
+  }, [closedReason, code, navigate])
 
   // ── Eventos del servidor que cambian de pantalla ──────────────────────────
   useEffect(() => {

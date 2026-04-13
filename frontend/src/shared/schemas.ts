@@ -162,21 +162,25 @@ export type FotoUploadResponse = z.infer<typeof FotoUploadResponseSchema>
 // ─── Error codes ──────────────────────────────────────────────────────────────
 
 export const ERROR_CODES = {
-  ROOM_NOT_FOUND: 'ROOM_NOT_FOUND',
-  ROOM_FULL: 'ROOM_FULL',
+  ROOM_NOT_FOUND:       'ROOM_NOT_FOUND',
+  ROOM_FULL:            'ROOM_FULL',
   GAME_ALREADY_STARTED: 'GAME_ALREADY_STARTED',
-  INVALID_NICKNAME: 'INVALID_NICKNAME',
-  UPLOAD_FAILED: 'UPLOAD_FAILED',
-  INSUFFICIENT_PHOTOS: 'INSUFFICIENT_PHOTOS',
+  INVALID_NICKNAME:     'INVALID_NICKNAME',
+  NICKNAME_TAKEN:       'NICKNAME_TAKEN',
+  UPLOAD_FAILED:        'UPLOAD_FAILED',
+  INSUFFICIENT_PHOTOS:  'INSUFFICIENT_PHOTOS',
+  UNAUTHORIZED:         'UNAUTHORIZED',
 } as const
 
 export type ErrorCode = keyof typeof ERROR_CODES
 
 export const ERROR_MESSAGES: Record<ErrorCode, string> = {
-  ROOM_NOT_FOUND: 'Esta sala ya cerró o el código no es correcto.',
-  ROOM_FULL: 'Esta sala ya tiene el máximo de jugadores.',
+  ROOM_NOT_FOUND:       'Esta sala ya cerró o el código no es correcto.',
+  ROOM_FULL:            'Esta sala ya tiene el máximo de jugadores.',
   GAME_ALREADY_STARTED: 'La partida ya empezó. Espera a la siguiente.',
-  INVALID_NICKNAME: 'El nickname debe tener entre 1 y 20 caracteres.',
-  UPLOAD_FAILED: 'No pudimos subir esa foto. Inténtalo de nuevo.',
-  INSUFFICIENT_PHOTOS: 'Necesitas al menos 10 fotos para confirmar.',
+  INVALID_NICKNAME:     'El nickname debe tener entre 1 y 20 caracteres.',
+  NICKNAME_TAKEN:       'Ese nombre ya lo usa otro jugador en esta sala.',
+  UPLOAD_FAILED:        'No pudimos subir esa foto. Inténtalo de nuevo.',
+  INSUFFICIENT_PHOTOS:  'Necesitas al menos 10 fotos para confirmar.',
+  UNAUTHORIZED:         'No tienes permiso para esta acción.',
 }
