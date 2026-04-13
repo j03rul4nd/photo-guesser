@@ -42,7 +42,7 @@ app.use(
       if (/^https:\/\/[a-z0-9-]+\.pages\.dev$/i.test(origin)) return origin
       return ''
     },
-    allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type'],
   }),
 )
@@ -134,22 +134,50 @@ app.post('/api/sala/:code/foto', async (c) => {
     return jsonError(ERROR_MESSAGES.UNAUTHORIZED, 403, 'UNAUTHORIZED')
   }
 
-  // Generar key única en R2
   const ext = mimeType.split('/')[1] ?? 'jpg'
   const key = `fotos/${codigo}/${jugadorId}/${crypto.randomUUID()}.${ext}`
 
-  // Generar presigned URL de R2 con TTL 1 hora
-  const expiresIn = 3600 // 1 hora
-  const uploadUrl = await (c.env.PHOTOS_BUCKET as R2Bucket & {
-    createPresignedUrl?: (method: string, key: string, opts: { expiresIn: number }) => Promise<string>
-  }).createPresignedUrl?.('PUT', key, { expiresIn })
+  // Devuelve la key — el cliente subirá via PUT /api/foto/:key
+  // No hay presigned URL: R2Bucket.createPresignedUrl no existe en Workers
+  return c.json({ uploadUrl: `${new URL(c.req.url).origin}/api/foto/${encodeURIComponent(key)}`, key }, 200)
+})
 
-  if (!uploadUrl) {
-    // Fallback para desarrollo local sin R2 real
-    return c.json({ uploadUrl: `http://localhost:8787/dev-upload/${key}`, key }, 200)
+// PUT /api/foto/:key — recibe el binario del cliente y lo guarda en R2
+app.put('/api/foto/:key{.+$}', async (c) => {
+  const key = decodeURIComponent(c.req.param('key'))
+  const contentType = c.req.header('Content-Type') ?? 'image/jpeg'
+
+  if (!contentType.startsWith('image/')) {
+    return jsonError('Solo se permiten imágenes', 400)
   }
 
-  return c.json({ uploadUrl, key }, 200)
+  const buffer = await c.req.arrayBuffer()
+
+  if (buffer.byteLength > 5 * 1024 * 1024) {
+    return jsonError('Archivo demasiado grande (máx 5MB)', 400)
+  }
+
+  await c.env.PHOTOS_BUCKET.put(key, buffer, {
+    httpMetadata: { contentType },
+  })
+
+  return c.json({ ok: true }, 200)
+})
+
+// GET /api/foto/:key — sirve una foto desde R2
+app.get('/api/foto/:key{.+$}', async (c) => {
+  const key = decodeURIComponent(c.req.param('key'))
+  const obj = await c.env.PHOTOS_BUCKET.get(key)
+
+  if (!obj) {
+    return c.json({ error: 'Foto no encontrada' }, 404)
+  }
+
+  const headers = new Headers()
+  obj.writeHttpMetadata(headers)
+  headers.set('Cache-Control', 'private, max-age=3600')
+
+  return new Response(obj.body, { headers })
 })
 
 // ─── GET /api/sala/:code/ws ───────────────────────────────────────────────────

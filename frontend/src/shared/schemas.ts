@@ -141,7 +141,7 @@ export const FotoUploadRequestSchema = z.object({
 })
 
 export const FotoUploadResponseSchema = z.object({
-  uploadUrl: z.string().url(),
+  uploadUrl: z.string(),
   key: z.string(),
 })
 

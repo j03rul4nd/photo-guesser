@@ -338,7 +338,7 @@ export class GameRoom implements DurableObject {
           key,
           propietarioId: jugador.id,
           propietarioNickname: jugador.nickname,
-          url: await this.getSignedUrl(key),
+          url: this.getSignedUrl(key),
         })
       }
     }
@@ -396,7 +396,7 @@ export class GameRoom implements DurableObject {
     }
 
     // Refresh signed URL for this round
-    foto.url = await this.getSignedUrl(foto.key)
+    foto.url = this.getSignedUrl(foto.key)
 
     this.broadcast(JSON.stringify({
       type: 'ROUND_START',
@@ -573,17 +573,9 @@ export class GameRoom implements DurableObject {
     }
   }
 
-  private async getSignedUrl(key: string): Promise<string> {
-    // En producción: generar presigned URL de R2
-    // En desarrollo sin R2: devolver la key como URL relativa
-    try {
-      const obj = await this.env.PHOTOS_BUCKET.get(key)
-      if (!obj) return `/dev-foto/${key}`
-      // R2 no tiene presigned URLs directas desde DO — se hace desde el Worker
-      // Aquí devolvemos una URL de acceso público o la gestionamos vía proxy
-      return `/api/foto/${encodeURIComponent(key)}`
-    } catch {
-      return `/dev-foto/${key}`
-    }
+  private getSignedUrl(key: string): string {
+    // Las fotos se sirven via GET /api/foto/:key desde el Worker
+    // No hay TTL aquí — el Worker valida acceso si hace falta
+    return `/api/foto/${encodeURIComponent(key)}`
   }
 }
