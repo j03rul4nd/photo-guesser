@@ -9,10 +9,18 @@ import { LoadingReveal } from '@/components/shared/LoadingReveal'
 import { api } from '@/lib/api'
 
 /**
- * SalaPage — Escenario A: el usuario viene de un link directo /sala/:code.
- * Muestra el código readonly + campo nickname.
- * El creador ve primero ShareRoom, luego redirige al lobby.
- * Un invitado va directo al lobby al hacer join.
+ * SalaPage — el usuario llega desde un link directo /sala/:code.
+ *
+ * Flujo del CREADOR (creator=1):
+ *   1. Introduce nickname → llama /join → guarda jugadorId → queda como HOST
+ *   2. Se muestra ShareRoom para que comparta el link mientras espera a los demás
+ *   3. Cuando pulsa "Continuar" → navega al lobby
+ *
+ * Flujo del INVITADO:
+ *   1. Introduce nickname → llama /join → navega directo al lobby
+ *
+ * Motivo del cambio: antes el creador veía ShareRoom primero (sin hacer join),
+ * por lo que cualquier invitado que se uniese antes adquiría el rol de host.
  */
 export function SalaPage() {
   const { code = '' } = useParams<{ code: string }>()
@@ -23,17 +31,15 @@ export function SalaPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Si venimos de crear sala, se muestra ShareRoom primero
+  // El creador hace join primero, después ve ShareRoom
   const isCreator = new URLSearchParams(window.location.search).get('creator') === '1'
-  const [showShare, setShowShare] = useState(isCreator)
+  const [showShare, setShowShare] = useState(false)  // siempre false hasta que haga join
 
   useEffect(() => {
-    if (!showShare) nicknameRef.current?.focus()
-  }, [showShare])
+    nicknameRef.current?.focus()
+  }, [])
 
-  const shakeForm = () => {
-    shakeElement(formRef.current)
-  }
+  const shakeForm = () => shakeElement(formRef.current)
 
   const handleSubmit = async () => {
     const trimmed = nickname.trim()
@@ -46,11 +52,17 @@ export function SalaPage() {
     setError(null)
     try {
       const { jugadorId } = await api.unirse(code, trimmed)
-      // Guardar en sessionStorage para el lobby
       sessionStorage.setItem('pg_jugador_id', jugadorId)
       sessionStorage.setItem('pg_nickname', trimmed)
       sessionStorage.setItem('pg_sala_code', code)
-      navigate(`/sala/${code}/lobby`)
+
+      if (isCreator) {
+        // El creador ya está registrado como host — ahora muestra la pantalla para compartir
+        setShowShare(true)
+        setLoading(false)
+      } else {
+        navigate(`/sala/${code}/lobby`)
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error al unirse'
       setError(msg)
@@ -59,11 +71,12 @@ export function SalaPage() {
     }
   }
 
+  // El creador ya hizo join y ahora comparte el link
   if (showShare) {
     return (
       <ShareRoom
         codigo={code}
-        onContinue={() => setShowShare(false)}
+        onContinue={() => navigate(`/sala/${code}/lobby`)}
       />
     )
   }
@@ -96,7 +109,7 @@ export function SalaPage() {
               letterSpacing: '-0.02em',
             }}
           >
-            Unirse a la sala
+            {isCreator ? 'Tu partida' : 'Unirse a la sala'}
           </h1>
           <p
             style={{
@@ -106,11 +119,13 @@ export function SalaPage() {
               margin: 0,
             }}
           >
-            Escribe tu nombre para entrar
+            {isCreator
+              ? 'Pon tu nombre para reservar tu plaza de host'
+              : 'Escribe tu nombre para entrar'}
           </p>
         </div>
 
-        {/* Código readonly — protagonista absoluto */}
+        {/* Código readonly */}
         <div>
           <label
             style={{
@@ -171,7 +186,7 @@ export function SalaPage() {
             maxLength={20}
             placeholder="¿Cómo te llamas?"
             value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
+            onChange={(e) => { setNickname(e.target.value); setError(null) }}
             onKeyDown={(e) => { if (e.key === 'Enter') void handleSubmit() }}
             style={{
               width: '100%',
@@ -188,12 +203,8 @@ export function SalaPage() {
               transition: 'border-color var(--transition-fast)',
               boxShadow: 'var(--shadow-sm)',
             }}
-            onFocus={(e) => {
-              if (!error) e.currentTarget.style.borderColor = 'var(--accent)'
-            }}
-            onBlur={(e) => {
-              if (!error) e.currentTarget.style.borderColor = 'var(--bg-secondary)'
-            }}
+            onFocus={(e) => { if (!error) e.currentTarget.style.borderColor = 'var(--accent)' }}
+            onBlur={(e) => { if (!error) e.currentTarget.style.borderColor = 'var(--text-primary)' }}
           />
           {error && (
             <p style={{ color: 'var(--incorrect)', fontFamily: 'var(--font-ui)', fontSize: '0.8rem', margin: '6px 0 0' }}>
@@ -204,9 +215,13 @@ export function SalaPage() {
 
         <PrivacyNotice />
 
-        <Button size="lg" style={{ width: '100%', boxShadow: 'var(--shadow-md)', fontFamily: 'var(--font-display)' }} onClick={() => void handleSubmit()}>
+        <Button
+          size="lg"
+          style={{ width: '100%', boxShadow: 'var(--shadow-md)', fontFamily: 'var(--font-display)' }}
+          onClick={() => void handleSubmit()}
+        >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-            Entrar
+            {isCreator ? 'Crear y entrar' : 'Entrar'}
             <ArrowRightIcon size={16} weight="bold" aria-hidden="true" />
           </span>
         </Button>

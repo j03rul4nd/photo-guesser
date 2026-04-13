@@ -20,6 +20,7 @@ interface Jugador {
   conectado: boolean
   fotosListas: boolean
   fotosAdivinadas: number
+  uploadCount: number   // cuota: máx 20 uploads por jugador
 }
 
 interface FotoRonda {
@@ -108,10 +109,12 @@ export class GameRoom implements DurableObject {
     const url = new URL(request.url)
     this.lastActivity = Date.now()
 
-    if (url.pathname === '/init' && request.method === 'POST') return this.handleInit()
-    if (url.pathname === '/join' && request.method === 'POST') return this.handleJoin(request)
-    if (url.pathname === '/auth' && request.method === 'POST') return this.handleAuth(request)
-    if (url.pathname === '/close' && request.method === 'POST') return this.handleClose()
+    if (url.pathname === '/init'        && request.method === 'POST') return this.handleInit()
+    if (url.pathname === '/join'        && request.method === 'POST') return this.handleJoin(request)
+    if (url.pathname === '/auth'        && request.method === 'POST') return this.handleAuth(request)
+    if (url.pathname === '/auth-upload' && request.method === 'POST') return this.handleAuthUpload(request)
+    if (url.pathname === '/auth-host'   && request.method === 'POST') return this.handleAuthHost(request)
+    if (url.pathname === '/close'       && request.method === 'POST') return this.handleClose()
 
     const upgradeHeader = request.headers.get('Upgrade')
     if (upgradeHeader?.toLowerCase() === 'websocket') return this.handleWebSocket(request)
@@ -129,13 +132,21 @@ export class GameRoom implements DurableObject {
   private async handleJoin(request: Request): Promise<Response> {
     const { jugadorId, nickname } = await request.json() as { jugadorId: string; nickname: string }
 
+    // Validar nickname
+    const trimmed = nickname?.trim() ?? ''
+    if (trimmed.length < 1 || trimmed.length > 20) {
+      return new Response(
+        JSON.stringify({ code: ERROR_CODES.INVALID_NICKNAME, error: ERROR_MESSAGES.INVALID_NICKNAME }),
+        { status: 422 },
+      )
+    }
+
     // Bloquear nuevas uniones durante juego activo o transición
     const estadosBloqueados: RoomState[] = ['round_showing', 'round_results', 'game_over', 'resetting']
     if (estadosBloqueados.includes(this.estado)) {
-      const code = this.estado === 'game_over' ? ERROR_CODES.GAME_ALREADY_STARTED : ERROR_CODES.GAME_ALREADY_STARTED
       console.log(`[JOIN] rechazado — estado=${this.estado} jugadorId=${jugadorId}`)
       return new Response(
-        JSON.stringify({ code, error: ERROR_MESSAGES[code] }),
+        JSON.stringify({ code: ERROR_CODES.GAME_ALREADY_STARTED, error: ERROR_MESSAGES.GAME_ALREADY_STARTED }),
         { status: 409 },
       )
     }
@@ -151,25 +162,39 @@ export class GameRoom implements DurableObject {
     // Si el jugador ya existe (reconexión HTTP antes de abrir WS)
     const existing = this.jugadores.get(jugadorId)
     if (existing) {
-      console.log(`[JOIN] re-join HTTP. jugadorId=${jugadorId} nickname=${nickname}`)
+      console.log(`[JOIN] re-join HTTP. jugadorId=${jugadorId} nickname=${trimmed}`)
       this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
       return new Response('OK', { status: 200 })
     }
 
+    // Nickname duplicado (case-insensitive) — rechazar
+    const nickLower = trimmed.toLowerCase()
+    const nicknameConflict = Array.from(this.jugadores.values()).some(
+      (j) => j.nickname.toLowerCase() === nickLower,
+    )
+    if (nicknameConflict) {
+      console.log(`[JOIN] rechazado — nickname en uso. jugadorId=${jugadorId} nickname=${trimmed}`)
+      return new Response(
+        JSON.stringify({ code: ERROR_CODES.NICKNAME_TAKEN, error: ERROR_MESSAGES.NICKNAME_TAKEN }),
+        { status: 409 },
+      )
+    }
+
     const jugador: Jugador = {
       id: jugadorId,
-      nickname,
+      nickname: trimmed,
       fotoKeys: [],
       puntuacion: 0,
       conectado: false,
       fotosListas: false,
       fotosAdivinadas: 0,
+      uploadCount: 0,
     }
 
     this.jugadores.set(jugadorId, jugador)
     if (!this.host) this.host = jugadorId
 
-    console.log(`[JOIN] nuevo jugador. jugadorId=${jugadorId} nickname=${nickname} host=${this.host} total=${this.jugadores.size}`)
+    console.log(`[JOIN] nuevo jugador. jugadorId=${jugadorId} nickname=${trimmed} host=${this.host} total=${this.jugadores.size}`)
     this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
     return new Response('OK', { status: 200 })
   }
@@ -177,6 +202,36 @@ export class GameRoom implements DurableObject {
   private async handleAuth(request: Request): Promise<Response> {
     const { jugadorId } = await request.json() as { jugadorId: string }
     if (!this.jugadores.has(jugadorId)) return new Response('Unauthorized', { status: 403 })
+    return new Response('OK', { status: 200 })
+  }
+
+  /** Verificar jugadorId para upload + controlar cuota (máx MAX_FOTOS uploads) */
+  private async handleAuthUpload(request: Request): Promise<Response> {
+    const { jugadorId } = await request.json() as { jugadorId: string }
+    const jugador = this.jugadores.get(jugadorId)
+    if (!jugador) {
+      return new Response(
+        JSON.stringify({ code: 'UNAUTHORIZED', error: ERROR_MESSAGES.UNAUTHORIZED }),
+        { status: 403 },
+      )
+    }
+    // Cuota: máx 20 fotos por jugador (equivale a MAX_FOTOS en el frontend)
+    if (jugador.uploadCount >= 20) {
+      return new Response(
+        JSON.stringify({ code: 'UPLOAD_FAILED', error: 'Límite de fotos alcanzado para este jugador.' }),
+        { status: 429 },
+      )
+    }
+    jugador.uploadCount++
+    return new Response('OK', { status: 200 })
+  }
+
+  /** Verificar que jugadorId es el host actual (para DELETE sala) */
+  private async handleAuthHost(request: Request): Promise<Response> {
+    const { jugadorId } = await request.json() as { jugadorId: string }
+    if (!jugadorId || jugadorId !== this.host) {
+      return new Response('Forbidden', { status: 403 })
+    }
     return new Response('OK', { status: 200 })
   }
 
@@ -230,9 +285,10 @@ export class GameRoom implements DurableObject {
         void this.sendCurrentGameState(server, jugadorId)
       }
     } else {
-      console.log(`[WS] WARN: jugadorId=${jugadorId} no encontrado en la sala`)
-      // Igualmente enviar lobby state para que el cliente tenga contexto
-      server.send(lobbyUpdateEvent(this.jugadores, this.host))
+      // Jugador desconocido — rechazar la conexión WS inmediatamente
+      console.log(`[WS] WARN: jugadorId=${jugadorId} no encontrado en la sala — cerrando WS`)
+      try { server.close(1008, 'Player not in room') } catch { /* ignore */ }
+      this.connections.delete(jugadorId)
     }
 
     server.addEventListener('message', (event) => {
@@ -422,6 +478,19 @@ export class GameRoom implements DurableObject {
         if (jugadorId !== this.host) return
         if (this.estado !== 'game_over') return
         await this.resetGame()
+        break
+      }
+
+      case 'ABORT_GAME': {
+        // Solo el host puede abortar una partida en curso
+        if (jugadorId !== this.host) {
+          this.sendTo(jugadorId, errorEvent('UNAUTHORIZED'))
+          return
+        }
+        const estadosAbortables: RoomState[] = ['round_showing', 'round_results']
+        if (!estadosAbortables.includes(this.estado)) return
+        console.log(`[ABORT_GAME] host=${jugador.nickname} abortando partida en ronda=${this.rondaActual}`)
+        await this.endGame()
         break
       }
     }
@@ -626,6 +695,7 @@ export class GameRoom implements DurableObject {
       jugador.fotoKeys = []
       jugador.fotosListas = false
       jugador.fotosAdivinadas = 0
+      jugador.uploadCount = 0
     }
 
     this.fotosPool = []
@@ -767,13 +837,44 @@ export class GameRoom implements DurableObject {
   async alarm(): Promise<void> {
     const inactivoMs = Date.now() - this.lastActivity
     if (inactivoMs >= 30 * 60 * 1000) {
-      console.log(`[ALARM] sala inactiva ${Math.round(inactivoMs / 60000)} min — cerrando`)
+      console.log(`[ALARM] sala inactiva ${Math.round(inactivoMs / 60000)} min — limpiando`)
+      // Cerrar conexiones activas
       for (const ws of this.connections.values()) {
         try { ws.close(1001, 'Inactivity timeout') } catch { /* ignore */ }
       }
       this.connections.clear()
+      // Limpiar fotos de R2 para no acumular almacenamiento en el plan gratuito
+      await this.cleanupR2Photos()
     } else {
       await this.state.storage.setAlarm(Date.now() + 30 * 60 * 1000)
+    }
+  }
+
+  /** Borra todas las fotos de R2 asociadas a esta sala */
+  private async cleanupR2Photos(): Promise<void> {
+    // El código de sala se infiere del primer fotoKey guardado
+    const anyKey = Array.from(this.jugadores.values())
+      .flatMap((j) => j.fotoKeys)
+      .find((k) => k.startsWith('fotos/'))
+    if (!anyKey) return
+
+    const parts = anyKey.split('/')
+    if (parts.length < 2) return
+    const codigo = parts[1]!
+    const prefix = `fotos/${codigo}/`
+
+    try {
+      let cursor: string | undefined
+      do {
+        const listed = await this.env.PHOTOS_BUCKET.list({ prefix, cursor })
+        if (listed.objects.length > 0) {
+          await Promise.all(listed.objects.map((obj) => this.env.PHOTOS_BUCKET.delete(obj.key)))
+          console.log(`[ALARM] borradas ${listed.objects.length} fotos de R2 (prefijo=${prefix})`)
+        }
+        cursor = listed.truncated ? listed.cursor : undefined
+      } while (cursor)
+    } catch (err) {
+      console.log(`[ALARM] error limpiando R2: ${String(err)}`)
     }
   }
 }

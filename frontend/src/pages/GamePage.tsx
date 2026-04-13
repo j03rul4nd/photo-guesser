@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { GameRound } from '@/features/juego/components/GameRound'
 import { FinalRanking } from '@/features/juego/components/FinalRanking'
@@ -35,6 +35,7 @@ export function GamePage() {
   const { jugadores, sendMessage, lastEvent, hostId: wsHostId } = useGameSocket(code, jugadorId)
   const startTimeRef = useRef<number>(Date.now())
   const isHost = jugadorId === wsHostId
+  const [showAbortConfirm, setShowAbortConfirm] = useState(false)
 
   useEffect(() => {
     if (!lastEvent) return
@@ -107,6 +108,11 @@ export function GamePage() {
     sendMessage({ type: 'PLAY_AGAIN' })
   }
 
+  const handleAbortGame = () => {
+    sendMessage({ type: 'ABORT_GAME' })
+    setShowAbortConfirm(false)
+  }
+
   if (gameOver) {
     return (
       <>
@@ -134,6 +140,44 @@ export function GamePage() {
         onTimerExpire={handleTimerExpire}
         startTimeRef={startTimeRef}
       />
+
+      {/* Botón de abortar — solo visible para el host, esquina inferior derecha */}
+      {isHost && !gameOver && (
+        <div style={{ position: 'fixed', bottom: '16px', right: '16px', zIndex: 50 }}>
+          {showAbortConfirm ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: 'var(--bg-surface)', border: '2px solid var(--incorrect)', borderRadius: 'var(--radius-md)', padding: '14px', boxShadow: 'var(--shadow-lg)', maxWidth: '220px' }}>
+              <p style={{ margin: 0, fontFamily: 'var(--font-ui)', fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                ¿Terminar la partida ahora?
+              </p>
+              <p style={{ margin: 0, fontFamily: 'var(--font-ui)', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                Se mostrará el ranking con las puntuaciones actuales.
+              </p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={handleAbortGame}
+                  style={{ flex: 1, padding: '8px', backgroundColor: 'var(--incorrect)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-ui)', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+                >
+                  Sí, terminar
+                </button>
+                <button
+                  onClick={() => setShowAbortConfirm(false)}
+                  style={{ flex: 1, padding: '8px', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: 'none', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAbortConfirm(true)}
+              title="Terminar partida (solo host)"
+              style={{ padding: '8px 12px', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--bg-secondary)', borderRadius: 'var(--radius-md)', fontFamily: 'var(--font-ui)', fontSize: '0.78rem', color: 'var(--text-muted)', cursor: 'pointer', boxShadow: 'var(--shadow-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              ✕ Terminar partida
+            </button>
+          )}
+        </div>
+      )}
     </>
   )
 }

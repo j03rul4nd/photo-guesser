@@ -70,8 +70,12 @@ export const api = {
     if (!res.ok) throw new Error(`Upload falló: ${res.status}`)
   },
 
-  /** DELETE /api/sala/:code — cerrar sala y limpiar R2 */
-  cerrarSala: async (code: string): Promise<void> => {
-    await fetch(`${API_BASE}/api/sala/${code}`, { method: 'DELETE' })
+  /** DELETE /api/sala/:code — cerrar sala y limpiar R2 (requiere ser el host) */
+  cerrarSala: async (code: string, jugadorId: string): Promise<void> => {
+    await fetch(`${API_BASE}/api/sala/${code}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jugadorId }),
+    })
   },
 }

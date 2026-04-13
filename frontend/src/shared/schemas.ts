@@ -118,6 +118,10 @@ export const ClientWSEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('PLAY_AGAIN'),
   }),
+  // v3.2: host only, aborts a running game and shows final ranking with current scores
+  z.object({
+    type: z.literal('ABORT_GAME'),
+  }),
 ])
 
 export type ClientWSEvent = z.infer<typeof ClientWSEventSchema>

@@ -12,20 +12,48 @@ import { JoinSalaRequestSchema, FotoUploadRequestSchema, ERROR_MESSAGES } from '
 
 export { GameRoom } from './GameRoom'
 
-// ─── Rate limit store (in-memory, per Worker instance) ───────────────────────
-// Máx 10 salas por IP/hora. No persiste entre instancias — suficiente para MVP.
-const rateLimitStore = new Map<string, RateLimitEntry>()
+// ─── Rate limit stores (in-memory, por instancia Worker) ──────────────────────
+// Limitación conocida: no se comparte entre instancias CF. Suficiente para MVP.
+const salaRateLimit   = new Map<string, RateLimitEntry>()   // Crear sala: 10/hora
+const joinRateLimit   = new Map<string, RateLimitEntry>()   // Join sala: 15/min
 
-function checkRateLimit(ip: string): boolean {
+function checkRateLimit(
+  store: Map<string, RateLimitEntry>,
+  key: string,
+  max: number,
+  windowMs: number,
+): boolean {
   const now = Date.now()
-  const entry = rateLimitStore.get(ip)
+  const entry = store.get(key)
   if (!entry || now > entry.resetAt) {
-    rateLimitStore.set(ip, { count: 1, resetAt: now + 60 * 60 * 1000 })
+    store.set(key, { count: 1, resetAt: now + windowMs })
     return true
   }
-  if (entry.count >= 10) return false
+  if (entry.count >= max) return false
   entry.count++
   return true
+}
+
+// ─── HMAC helpers — firmar/verificar tokens de upload ────────────────────────
+
+async function signUploadKey(key: string, secret: string): Promise<string> {
+  const enc = new TextEncoder()
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw', enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false, ['sign'],
+  )
+  const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(key))
+  // base64url sin padding
+  return btoa(String.fromCharCode(...new Uint8Array(sig)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+async function verifyUploadToken(key: string, token: string, secret: string): Promise<boolean> {
+  try {
+    const expected = await signUploadKey(key, secret)
+    return expected === token
+  } catch { return false }
 }
 
 // ─── Hono app ─────────────────────────────────────────────────────────────────
@@ -50,7 +78,7 @@ app.use(
 // ─── POST /api/sala ───────────────────────────────────────────────────────────
 app.post('/api/sala', async (c) => {
   const ip = getClientIP(c.req.raw)
-  if (!checkRateLimit(ip)) {
+  if (!checkRateLimit(salaRateLimit, ip, 10, 60 * 60 * 1000)) {
     return c.json({ error: 'Demasiadas salas creadas. Espera un poco.', code: 'RATE_LIMITED' }, 429)
   }
 
@@ -58,7 +86,6 @@ app.post('/api/sala', async (c) => {
   const origin = c.req.header('origin') ?? 'http://localhost:5173'
   const joinUrl = `${origin}/sala/${codigo}`
 
-  // Crear el Durable Object para esta sala
   const doId = c.env.GAME_ROOM.idFromName(codigo)
   const stub = c.env.GAME_ROOM.get(doId)
   await stub.fetch(new Request('http://internal/init', { method: 'POST' }))
@@ -69,6 +96,12 @@ app.post('/api/sala', async (c) => {
 // ─── POST /api/sala/:code/join ────────────────────────────────────────────────
 app.post('/api/sala/:code/join', async (c) => {
   const codigo = normalizeSalaCode(c.req.param('code'))
+  const ip = getClientIP(c.req.raw)
+
+  // Máx 15 intentos de join por IP por minuto
+  if (!checkRateLimit(joinRateLimit, ip, 15, 60 * 1000)) {
+    return jsonError('Demasiados intentos. Espera un momento.', 429, 'RATE_LIMITED')
+  }
 
   let body: unknown
   try { body = await c.req.json() }
@@ -119,30 +152,40 @@ app.post('/api/sala/:code/foto', async (c) => {
 
   const { jugadorId, mimeType } = result.data
 
-  // Verificar que el jugadorId pertenece a esta sala
+  // Verificar jugadorId y cuota de uploads
   const doId = c.env.GAME_ROOM.idFromName(codigo)
   const stub = c.env.GAME_ROOM.get(doId)
 
   const authRes = await stub.fetch(
-    new Request('http://internal/auth', {
+    new Request('http://internal/auth-upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jugadorId }),
     }),
   )
   if (!authRes.ok) {
-    return jsonError(ERROR_MESSAGES.UNAUTHORIZED, 403, 'UNAUTHORIZED')
+    const err = await authRes.json() as { code?: string; error?: string }
+    const code = (err.code ?? 'UNAUTHORIZED') as keyof typeof ERROR_MESSAGES
+    return jsonError(ERROR_MESSAGES[code] ?? 'Error de autenticación', authRes.status, code)
   }
 
   const ext = mimeType.split('/')[1] ?? 'jpg'
   const key = `fotos/${codigo}/${jugadorId}/${crypto.randomUUID()}.${ext}`
 
-  // Devuelve la key — el cliente subirá via PUT /api/foto/:key
-  // No hay presigned URL: R2Bucket.createPresignedUrl no existe en Workers
-  return c.json({ uploadUrl: `${new URL(c.req.url).origin}/api/foto/${encodeURIComponent(key)}`, key }, 200)
+  // Firmar la key para evitar uploads no autorizados
+  const origin = new URL(c.req.url).origin
+  let uploadUrl: string
+  if (c.env.UPLOAD_SECRET) {
+    const token = await signUploadKey(key, c.env.UPLOAD_SECRET)
+    uploadUrl = `${origin}/api/foto/${encodeURIComponent(key)}?t=${token}`
+  } else {
+    uploadUrl = `${origin}/api/foto/${encodeURIComponent(key)}`
+  }
+
+  return c.json({ uploadUrl, key }, 200)
 })
 
-// PUT /api/foto/:key — recibe el binario del cliente y lo guarda en R2
+// ─── PUT /api/foto/:key — recibe binario del cliente y lo guarda en R2 ────────
 app.put('/api/foto/:key{.+$}', async (c) => {
   const key = decodeURIComponent(c.req.param('key'))
   const contentType = c.req.header('Content-Type') ?? 'image/jpeg'
@@ -151,10 +194,26 @@ app.put('/api/foto/:key{.+$}', async (c) => {
     return jsonError('Solo se permiten imágenes', 400)
   }
 
+  // Validar token HMAC si hay secret configurado
+  if (c.env.UPLOAD_SECRET) {
+    const token = new URL(c.req.url).searchParams.get('t') ?? ''
+    if (!token || !(await verifyUploadToken(key, token, c.env.UPLOAD_SECRET))) {
+      return jsonError('Token de upload inválido o expirado', 403, 'UNAUTHORIZED')
+    }
+  }
+
+  // Validar que la key tiene el formato esperado (fotos/{code}/{uuid}/{uuid}.{ext})
+  if (!/^fotos\/[A-Z0-9]{4,10}\/[a-f0-9-]{36}\/[a-f0-9-]{36}\.\w{3,4}$/.test(key)) {
+    return jsonError('Key de foto inválida', 400, 'UPLOAD_FAILED')
+  }
+
   const buffer = await c.req.arrayBuffer()
 
   if (buffer.byteLength > 5 * 1024 * 1024) {
     return jsonError('Archivo demasiado grande (máx 5MB)', 400)
+  }
+  if (buffer.byteLength < 100) {
+    return jsonError('Archivo demasiado pequeño', 400)
   }
 
   await c.env.PHOTOS_BUCKET.put(key, buffer, {
@@ -164,7 +223,7 @@ app.put('/api/foto/:key{.+$}', async (c) => {
   return c.json({ ok: true }, 200)
 })
 
-// GET /api/foto/:key — sirve una foto desde R2
+// ─── GET /api/foto/:key — sirve una foto desde R2 ─────────────────────────────
 app.get('/api/foto/:key{.+$}', async (c) => {
   const key = decodeURIComponent(c.req.param('key'))
   const obj = await c.env.PHOTOS_BUCKET.get(key)
@@ -176,6 +235,8 @@ app.get('/api/foto/:key{.+$}', async (c) => {
   const headers = new Headers()
   obj.writeHttpMetadata(headers)
   headers.set('Cache-Control', 'private, max-age=3600')
+  // Evitar hotlinking desde orígenes externos
+  headers.set('X-Content-Type-Options', 'nosniff')
 
   return new Response(obj.body, { headers })
 })
@@ -194,26 +255,64 @@ app.get('/api/sala/:code/ws', async (c) => {
   return stub.fetch(c.req.raw)
 })
 
-// ─── DELETE /api/sala/:code ───────────────────────────────────────────────────
+// ─── DELETE /api/sala/:code — requiere ser el host ────────────────────────────
 app.delete('/api/sala/:code', async (c) => {
   const codigo = normalizeSalaCode(c.req.param('code'))
 
+  // Autenticación: el host debe identificarse
+  let jugadorId = ''
+  try {
+    const body = await c.req.json() as { jugadorId?: string }
+    jugadorId = body.jugadorId ?? ''
+  } catch { /* sin body */ }
+
+  if (!jugadorId) {
+    jugadorId = c.req.header('X-Host-Id') ?? ''
+  }
+
+  if (!jugadorId) {
+    return jsonError('Se requiere jugadorId del host para cerrar la sala', 403, 'UNAUTHORIZED')
+  }
+
   const doId = c.env.GAME_ROOM.idFromName(codigo)
   const stub = c.env.GAME_ROOM.get(doId)
+
+  // Verificar que el requester es el host actual
+  const authRes = await stub.fetch(
+    new Request('http://internal/auth-host', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jugadorId }),
+    }),
+  )
+  if (!authRes.ok) {
+    return jsonError('No eres el host de esta sala', 403, 'UNAUTHORIZED')
+  }
+
+  // Cerrar el DO (broadcast ROOM_CLOSED a todos)
   await stub.fetch(new Request('http://internal/close', { method: 'POST' }))
 
   // Borrar todas las fotos del bucket para esta sala
-  const prefix = `fotos/${codigo}/`
-  const listed = await c.env.PHOTOS_BUCKET.list({ prefix })
-  if (listed.objects.length > 0) {
-    await Promise.all(listed.objects.map((obj) => c.env.PHOTOS_BUCKET.delete(obj.key)))
-  }
+  await deleteRoomPhotos(c.env, codigo)
 
   return c.json({ ok: true }, 200)
 })
 
+// ─── Helper: limpiar R2 de una sala ──────────────────────────────────────────
+async function deleteRoomPhotos(env: Env, codigo: string): Promise<void> {
+  const prefix = `fotos/${codigo}/`
+  let cursor: string | undefined
+  do {
+    const listed = await env.PHOTOS_BUCKET.list({ prefix, cursor })
+    if (listed.objects.length > 0) {
+      await Promise.all(listed.objects.map((obj) => env.PHOTOS_BUCKET.delete(obj.key)))
+    }
+    cursor = listed.truncated ? listed.cursor : undefined
+  } while (cursor)
+}
+
 // ─── Health ───────────────────────────────────────────────────────────────────
-app.get('/health', (c) => c.json({ status: 'ok', version: '1.0.0' }))
+app.get('/health', (c) => c.json({ status: 'ok', version: '2.0.0' }))
 
 app.notFound((c) => c.json({ error: 'Ruta no encontrada' }, 404))
 

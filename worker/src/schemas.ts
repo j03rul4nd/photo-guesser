@@ -24,6 +24,7 @@ export const ClientWSEventSchema = z.discriminatedUnion('type', [
     tiempoMs: z.number().int().min(0).max(15000),
   }),
   z.object({ type: z.literal('PLAY_AGAIN') }),
+  z.object({ type: z.literal('ABORT_GAME') }),
 ])
 
 export type ClientWSEvent = z.infer<typeof ClientWSEventSchema>
@@ -35,6 +36,7 @@ export const ERROR_CODES = {
   ROOM_FULL:            'ROOM_FULL',
   GAME_ALREADY_STARTED: 'GAME_ALREADY_STARTED',
   INVALID_NICKNAME:     'INVALID_NICKNAME',
+  NICKNAME_TAKEN:       'NICKNAME_TAKEN',
   UPLOAD_FAILED:        'UPLOAD_FAILED',
   INSUFFICIENT_PHOTOS:  'INSUFFICIENT_PHOTOS',
   UNAUTHORIZED:         'UNAUTHORIZED',
@@ -47,6 +49,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   ROOM_FULL:            'Esta sala ya tiene el máximo de jugadores.',
   GAME_ALREADY_STARTED: 'La partida ya empezó. Espera a la siguiente.',
   INVALID_NICKNAME:     'El nickname debe tener entre 1 y 20 caracteres.',
+  NICKNAME_TAKEN:       'Ese nombre ya lo usa otro jugador en esta sala.',
   UPLOAD_FAILED:        'No pudimos subir esa foto. Inténtalo de nuevo.',
   INSUFFICIENT_PHOTOS:  'Necesitas al menos 10 fotos para confirmar.',
   UNAUTHORIZED:         'No tienes permiso para esta acción.',

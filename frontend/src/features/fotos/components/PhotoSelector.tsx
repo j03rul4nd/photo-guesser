@@ -80,14 +80,19 @@ export function PhotoSelector({ salaCode, jugadorId, onConfirm, onClose }: Photo
     })
   }
 
-  const handleReplace = (_key: string) => {
+  const handleReplace = (key: string) => {
     const usedNames = fotos.map((f) => f.nombre)
     const replacement = getReplacementFor(usedNames)
     if (!replacement) {
       alert('No hay más fotos disponibles en el pool. Selecciona más fotos manualmente.')
       return
     }
-    setFotos((prev) => [...prev, makeLocal(replacement)])
+    setFotos((prev) => {
+      // Revocar el objectURL de la foto que se elimina para liberar memoria
+      const toRemove = prev.find((x) => x.key === key)
+      if (toRemove) URL.revokeObjectURL(toRemove.previewUrl)
+      return prev.filter((x) => x.key !== key).concat(makeLocal(replacement))
+    })
   }
 
   const handleConfirmar = async () => {

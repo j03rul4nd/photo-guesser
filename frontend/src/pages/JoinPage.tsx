@@ -57,12 +57,17 @@ export function JoinPage() {
       sessionStorage.setItem('pg_sala_code', normalizedCode)
       navigate(`/sala/${normalizedCode}/lobby`)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Error al unirse'
-      // Si el error es de sala (código incorrecto), lo mostramos en el campo de código
-      setCodeError(msg)
+      const error = err as Error & { code?: string }
+      const msg = error.message ?? 'Error al unirse'
       shakeForm()
-      if (codeInputRef.current) {
-        codeInputRef.current.style.borderColor = 'var(--incorrect)'
+      // Errores de nickname → campo de nickname; el resto → campo de código
+      if (error.code === 'NICKNAME_TAKEN' || error.code === 'INVALID_NICKNAME') {
+        setNicknameError(msg)
+      } else {
+        setCodeError(msg)
+        if (codeInputRef.current) {
+          codeInputRef.current.style.borderColor = 'var(--incorrect)'
+        }
       }
       setLoading(false)
     }
