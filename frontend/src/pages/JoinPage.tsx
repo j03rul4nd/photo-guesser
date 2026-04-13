@@ -77,13 +77,14 @@ export function JoinPage() {
     fontSize: '1rem',
     color: 'var(--text-primary)',
     backgroundColor: 'var(--bg-surface)',
-    border: '2px solid var(--bg-secondary)',
+    border: '2px solid var(--text-primary)',
     borderRadius: 'var(--radius-md)',
-    padding: '12px 16px',
+    padding: '14px 16px',
     outline: 'none',
-    minHeight: '48px',
+    minHeight: '52px',
     boxSizing: 'border-box' as const,
     transition: 'border-color var(--transition-fast)',
+    boxShadow: 'var(--shadow-sm)',
   }
 
   return (
@@ -100,16 +101,17 @@ export function JoinPage() {
     >
       <div
         ref={formRef}
-        style={{ width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '20px' }}
+        style={{ width: '100%', maxWidth: '390px', display: 'flex', flexDirection: 'column', gap: '20px', backgroundColor: 'var(--bg-primary)' }}
       >
         <div>
           <h1
             style={{
               fontFamily: 'var(--font-display)',
               fontWeight: 800,
-              fontSize: '1.6rem',
+              fontSize: 'clamp(1.8rem, 7vw, 2.3rem)',
               margin: '0 0 4px',
               color: 'var(--text-primary)',
+              letterSpacing: '-0.02em',
             }}
           >
             Unirse a partida
@@ -135,7 +137,7 @@ export function JoinPage() {
               fontFamily: 'var(--font-ui)',
               fontSize: '0.75rem',
               color: 'var(--text-muted)',
-              marginBottom: '6px',
+              marginBottom: '8px',
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
             }}
@@ -160,10 +162,13 @@ export function JoinPage() {
             style={{
               ...inputBase,
               fontFamily: 'var(--font-mono)',
-              fontSize: '1.6rem',
+              fontSize: 'clamp(2rem, 8vw, 2.5rem)',
               fontWeight: 700,
               letterSpacing: '0.15em',
               borderColor: codeError ? 'var(--incorrect)' : 'var(--bg-secondary)',
+              textAlign: 'center',
+              textTransform: 'uppercase',
+              boxShadow: 'var(--shadow-photo)',
             }}
           />
           {codeError && (
@@ -204,7 +209,8 @@ export function JoinPage() {
             onKeyDown={(e) => { if (e.key === 'Enter') void handleSubmit() }}
             style={{
               ...inputBase,
-              borderColor: nicknameError ? 'var(--incorrect)' : 'var(--bg-secondary)',
+              borderColor: nicknameError ? 'var(--incorrect)' : 'var(--text-primary)',
+              fontSize: '1.05rem',
             }}
           />
           {nicknameError && (
@@ -218,7 +224,7 @@ export function JoinPage() {
 
         <Button
           size="lg"
-          style={{ width: '100%' }}
+          style={{ width: '100%', boxShadow: 'var(--shadow-md)', fontFamily: 'var(--font-display)', letterSpacing: '0.01em' }}
           disabled={!code.trim() || !nickname.trim()}
           onClick={() => void handleSubmit()}
         >

@@ -26,10 +26,12 @@ export function PlayerStatus({ jugador, isHost, isMe }: PlayerStatusProps) {
     <motion.div
       layout
       style={{
-        padding: '12px 16px',
+        padding: '14px 16px',
         borderRadius: 'var(--radius-xl)',
-        backgroundColor: 'var(--bg-secondary)',
-        borderLeft: `3px solid ${borderColor}`,
+        backgroundColor: 'var(--bg-surface)',
+        borderLeft: `4px solid ${borderColor}`,
+        border: '1px solid var(--bg-secondary)',
+        boxShadow: 'var(--shadow-sm)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -40,7 +42,7 @@ export function PlayerStatus({ jugador, isHost, isMe }: PlayerStatusProps) {
         <span
           style={{
             fontFamily: 'var(--font-ui)',
-            fontWeight: 500,
+              fontWeight: 700,
             color: 'var(--text-primary)',
             fontSize: '1rem',
           }}
@@ -58,7 +60,7 @@ export function PlayerStatus({ jugador, isHost, isMe }: PlayerStatusProps) {
               fontSize: '0.7rem',
               fontFamily: 'var(--font-ui)',
               color: 'var(--accent)',
-              backgroundColor: 'rgba(255,77,46,0.1)',
+              backgroundColor: 'var(--bg-primary)',
               padding: '2px 6px',
               borderRadius: 'var(--radius-sm)',
               fontWeight: 600,

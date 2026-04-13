@@ -10,7 +10,7 @@ interface PlayerListProps {
 
 export function PlayerList({ jugadores, hostId, miId }: PlayerListProps) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <AnimatePresence mode="popLayout">
         {jugadores.map((j) => (
           <motion.div

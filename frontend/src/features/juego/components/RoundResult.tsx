@@ -39,10 +39,10 @@ export function RoundResult({ propietarioNickname, respuestasCorrectas, puntosGa
   }, [youAcertaste])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', maxWidth: '480px', margin: '0 auto', width: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', maxWidth: '780px', margin: '0 auto', width: '100%' }}>
       {/* Propietario */}
-      <div ref={ownerLabelRef} style={{ textAlign: 'center', padding: '16px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}>
-        <p style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.4rem', margin: '0 0 4px', color: 'var(--text-primary)' }}>
+      <div ref={ownerLabelRef} style={{ textAlign: 'center', padding: '20px 16px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-photo)', border: '2px solid var(--text-primary)' }}>
+        <p style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(1.6rem, 6vw, 2.3rem)', margin: '0 0 4px', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
           Era de <span style={{ color: 'var(--accent)' }}>{propietarioNickname}</span>
         </p>
         <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-muted)', margin: 0 }}>
@@ -55,7 +55,7 @@ export function RoundResult({ propietarioNickname, respuestasCorrectas, puntosGa
         <div ref={correctOptRef} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Acertaron</p>
           {rankingActual.filter((r) => respuestasCorrectas.includes(r.id)).map((r, i) => (
-            <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: 'var(--correct-bg)', border: '1px solid var(--correct)', borderRadius: 'var(--radius-md)' }}>
+            <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', backgroundColor: 'var(--correct-bg)', border: '2px solid var(--correct)', borderRadius: 'var(--radius-md)' }}>
               <span style={{ fontFamily: 'var(--font-ui)', fontWeight: 500, color: 'var(--correct)' }}>
                 {r.nickname} {r.id === miId && '(tú)'}
               </span>
@@ -80,7 +80,7 @@ export function RoundResult({ propietarioNickname, respuestasCorrectas, puntosGa
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30, delay: idx * 0.05 }}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', borderLeft: `3px solid ${idx === 0 ? 'var(--accent)' : 'transparent'}` }}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', borderLeft: `4px solid ${idx === 0 ? 'var(--accent)' : 'var(--bg-secondary)'}`, boxShadow: 'var(--shadow-sm)' }}
             >
               <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.9rem', color: idx === 0 ? 'var(--accent)' : 'var(--text-primary)', fontWeight: idx === 0 ? 700 : 400 }}>
                 {idx + 1}. {item.nickname} {item.id === miId && '(tú)'}

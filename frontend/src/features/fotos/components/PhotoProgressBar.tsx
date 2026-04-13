@@ -9,15 +9,15 @@ interface PhotoProgressBarProps {
  */
 export function PhotoProgressBar({ actual, total = 10 }: PhotoProgressBarProps) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: 'var(--bg-surface)', padding: '12px', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
       {/* Tira de cine */}
-      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
         {Array.from({ length: total }).map((_, i) => (
           <div
             key={i}
             style={{
               flex: 1,
-              height: '20px',
+              height: '22px',
               borderRadius: '2px',
               backgroundColor: i < actual ? 'var(--accent)' : 'var(--bg-secondary)',
               transition: 'background-color var(--transition-fast)',

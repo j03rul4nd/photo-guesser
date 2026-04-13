@@ -48,39 +48,102 @@ export function HomePage() {
 
   return (
     <div style={{ minHeight: '100dvh', backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative', overflow: 'hidden' }}>
-      {/* Siluetas Polaroid de fondo */}
+      {/* Siluetas Polaroid de fondo — marcos físicos blancos */}
       {siluetas.map((s, i) => (
         <div
           key={i}
           ref={(el) => { if (el) polaroidRefs.current[i] = el }}
           className="decorative-animation"
-          style={{ position: 'absolute', top: s.top, left: 'left' in s ? s.left : undefined, right: 'right' in s ? s.right : undefined, bottom: 'bottom' in s ? s.bottom : undefined, width: s.width, transform: `rotate(${s.rotate})`, opacity: 0.08, backgroundColor: 'var(--bg-secondary)', borderRadius: '2px', paddingBottom: '28px', boxShadow: 'var(--shadow-sm)', pointerEvents: 'none' }}
+          style={{
+            position: 'absolute',
+            top: s.top,
+            left: 'left' in s ? s.left : undefined,
+            right: 'right' in s ? s.right : undefined,
+            bottom: 'bottom' in s ? s.bottom : undefined,
+            width: s.width,
+            transform: `rotate(${s.rotate})`,
+            opacity: 0.08,
+            backgroundColor: 'var(--bg-surface)',
+            borderRadius: 'var(--radius-photo)',
+            padding: '12px',
+            paddingBottom: '32px',
+            boxShadow: 'var(--shadow-sm)',
+            pointerEvents: 'none',
+          }}
         >
-          <div style={{ width: '100%', aspectRatio: '1', backgroundColor: 'var(--bg-primary)' }} />
+          {/* Área de la foto */}
+          <div style={{ width: '100%', aspectRatio: '1', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-photo)' }} />
         </div>
       ))}
 
       {/* Contenido */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', maxWidth: '320px', width: '100%', position: 'relative', zIndex: 1 }}>
-        <h1 ref={logoRef} style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2.8rem', margin: 0, lineHeight: 1, textAlign: 'center', color: 'var(--text-primary)' }}>
-          PHOTO <span style={{ color: 'var(--accent)' }}>GUESSER</span>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', maxWidth: '390px', width: '100%', position: 'relative', zIndex: 1 }}>
+        {/* Logo impactante con jerarquía visual */}
+        <h1 ref={logoRef} style={{
+          fontFamily: 'var(--font-display)',
+          fontWeight: 800,
+          fontSize: 'clamp(3rem, 14vw, 5.2rem)',
+          margin: 0,
+          lineHeight: 0.95,
+          textAlign: 'center',
+          color: 'var(--text-primary)',
+          letterSpacing: '-0.04em',
+          textTransform: 'uppercase',
+          textWrap: 'balance',
+          textShadow: '2px 2px 0 var(--bg-secondary)',
+        }}>
+          PHOTO<br /><span style={{ color: 'var(--accent)' }}>GUESSER</span>
         </h1>
 
-        <p ref={taglineRef} style={{ fontFamily: 'var(--font-body)', fontStyle: 'italic', fontSize: '1.1rem', color: 'var(--text-secondary)', margin: '0 0 24px', textAlign: 'center' }}>
+        {/* Tagline en serif para contraste editorial */}
+        <p ref={taglineRef} style={{
+          fontFamily: 'var(--font-body)',
+          fontStyle: 'italic',
+          fontSize: 'clamp(1rem, 3vw, 1.125rem)',
+          color: 'var(--text-secondary)',
+          margin: '0 0 32px',
+          textAlign: 'center',
+          fontWeight: 400,
+          maxWidth: '28ch',
+        }}>
           ¿cuánto conoces a tus amigos?
         </p>
 
+        {/* Mensaje de error si existe */}
         {error && (
-          <p style={{ color: 'var(--incorrect)', fontFamily: 'var(--font-ui)', fontSize: '0.875rem', margin: '0 0 8px', textAlign: 'center' }}>
+          <p style={{ color: 'var(--incorrect)', fontFamily: 'var(--font-ui)', fontSize: '0.875rem', margin: '0 0 12px', textAlign: 'center' }}>
             {error}
           </p>
         )}
 
+        {/* Botones con clara jerarquía visual */}
         <div ref={buttonsRef} style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
-          <Button size="lg" style={{ width: '100%' }} onClick={() => void handleCrear()}>
+          {/* CTA principal — "Crear partida" con sombra pronunciada */}
+          <Button
+            size="lg"
+            style={{
+              width: '100%',
+              boxShadow: 'var(--shadow-lg)',
+              fontFamily: 'var(--font-display)',
+              letterSpacing: '0.01em',
+              fontSize: '1.05rem',
+            }}
+            onClick={() => void handleCrear()}
+          >
             Crear partida
           </Button>
-          <Button size="lg" variant="secondary" style={{ width: '100%' }} onClick={() => navigate('/unirse')}>
+          {/* CTA secundaria — "Unirse a partida" con borde claro */}
+          <Button
+            size="lg"
+            variant="secondary"
+            style={{
+              width: '100%',
+              border: '2px solid var(--text-primary)',
+              boxShadow: 'var(--shadow-sm)',
+              fontWeight: 600,
+            }}
+            onClick={() => navigate('/unirse')}
+          >
             Unirse a partida
           </Button>
         </div>

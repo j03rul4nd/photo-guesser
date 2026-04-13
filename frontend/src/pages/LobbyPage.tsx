@@ -83,14 +83,14 @@ export function LobbyPage() {
       )}
 
       {/* Header */}
-      <header style={{ padding: '16px 20px', backgroundColor: 'var(--bg-surface)', borderBottom: '1px solid var(--bg-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header style={{ padding: '14px 16px', backgroundColor: 'var(--bg-surface)', borderBottom: '1px solid var(--bg-secondary)', display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px', alignItems: 'center' }}>
         <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
           PHOTO <span style={{ color: 'var(--accent)' }}>GUESSER</span>
         </span>
         <button
           onClick={() => void handleCopyCode()}
           aria-label="Copiar link de sala"
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: '1px solid var(--bg-secondary)', borderRadius: 'var(--radius-md)', padding: '6px 12px', cursor: 'pointer', minHeight: '44px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.9rem', letterSpacing: '0.1em' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'var(--bg-secondary)', border: '2px solid var(--text-primary)', borderRadius: 'var(--radius-md)', padding: '8px 12px', cursor: 'pointer', minHeight: '44px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.9rem', letterSpacing: '0.1em', boxShadow: 'var(--shadow-sm)' }}
         >
           {code.toUpperCase()}
           {copied ? <Check size={14} style={{ color: 'var(--correct)' }} /> : <Copy size={14} />}
@@ -99,8 +99,8 @@ export function LobbyPage() {
       </header>
 
       {/* Main */}
-      <main style={{ flex: 1, padding: '24px 20px', maxWidth: '480px', margin: '0 auto', width: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '20px' }}>
+      <main style={{ flex: 1, padding: '24px 20px', maxWidth: '560px', margin: '0 auto', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '18px' }}>
           <Wifi size={14} style={{ color: estado === 'connected' ? 'var(--correct)' : 'var(--text-muted)' }} />
           <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
             {jugadores.length} jugador{jugadores.length !== 1 ? 'es' : ''} en sala
@@ -110,12 +110,12 @@ export function LobbyPage() {
         <PlayerList jugadores={jugadores} hostId={hostId} miId={jugadorId} />
 
         <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <Button variant="secondary" style={{ width: '100%' }} onClick={() => setShowSelector(true)}>
+          <Button variant="secondary" style={{ width: '100%', border: '2px solid var(--text-primary)', boxShadow: 'var(--shadow-sm)', fontWeight: 700 }} onClick={() => setShowSelector(true)}>
             📸 Elegir mis fotos
           </Button>
 
           {isHost && (
-            <Button size="lg" style={{ width: '100%' }} disabled={!puedeIniciar} onClick={() => sendMessage({ type: 'START_GAME' })}>
+            <Button size="lg" style={{ width: '100%', boxShadow: puedeIniciar ? 'var(--shadow-lg)' : 'none', fontFamily: 'var(--font-display)', letterSpacing: '0.01em' }} disabled={!puedeIniciar} onClick={() => sendMessage({ type: 'START_GAME' })}>
               {puedeIniciar ? '🎮 Iniciar partida' : `Esperando fotos (${listosCount}/2 mínimo)`}
             </Button>
           )}

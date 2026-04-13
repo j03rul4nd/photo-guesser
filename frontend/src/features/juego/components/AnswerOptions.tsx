@@ -34,7 +34,7 @@ const estadoStyles: Record<ReturnType<typeof getEstadoOpcion>, React.CSSProperti
     opacity: 1,
   },
   selected: {
-    backgroundColor: 'rgba(255,77,46,0.08)',
+    backgroundColor: 'var(--bg-surface)',
     border: '2px solid var(--accent)',
     color: 'var(--text-primary)',
     opacity: 1,
@@ -78,7 +78,7 @@ export function AnswerOptions({
       style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
-        gap: '10px',
+        gap: '12px',
       }}
     >
       {opciones.map((opcion) => {
@@ -93,18 +93,19 @@ export function AnswerOptions({
             className="option-feedback"
             style={{
               minHeight: '54px',
-              padding: '12px 16px',
+              padding: '14px 16px',
               borderRadius: 'var(--radius-md)',
               cursor: puedeResponder ? 'pointer' : 'default',
               fontFamily: 'var(--font-ui)',
-              fontWeight: 500,
-              fontSize: '0.95rem',
+              fontWeight: 700,
+              fontSize: '1rem',
               textAlign: 'center',
               lineHeight: 1.3,
               // Feedback táctil + transición de color — CSS puro
               transition:
                 'transform 80ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out, opacity 200ms ease-out',
               ...estilos,
+              boxShadow: estado === 'correct' || estado === 'incorrect' ? 'var(--shadow-sm)' : 'none',
             }}
             onMouseDown={(e) => {
               if (puedeResponder) e.currentTarget.style.transform = 'scale(0.96)'

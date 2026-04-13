@@ -64,8 +64,8 @@ export function FinalRanking({ rankingFinal, miId, isHost, onPlayAgain }: FinalR
     <div style={{ minHeight: '100dvh', backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 24px', gap: '32px' }}>
       {/* Título */}
       <div ref={titleRef} style={{ textAlign: 'center', opacity: 0 }}>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2.2rem', color: 'var(--accent)', margin: '0 0 0', lineHeight: 1 }}>FIN DE LA</h1>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2.2rem', color: 'var(--text-primary)', margin: 0, lineHeight: 1 }}>PARTIDA</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(2.2rem, 12vw, 4.8rem)', color: 'var(--accent)', margin: '0 0 0', lineHeight: 0.92, letterSpacing: '-0.03em' }}>FIN DE LA</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(2.2rem, 12vw, 4.8rem)', color: 'var(--text-primary)', margin: 0, lineHeight: 0.92, letterSpacing: '-0.03em' }}>PARTIDA</h1>
         {ganador && (
           <p style={{ fontFamily: 'var(--font-body)', fontStyle: 'italic', color: 'var(--text-secondary)', marginTop: '8px' }}>
             Ganador: <strong>{ganador.nickname}</strong> 🏆
@@ -74,7 +74,7 @@ export function FinalRanking({ rankingFinal, miId, isHost, onPlayAgain }: FinalR
       </div>
 
       {/* Ranking */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '400px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '520px' }}>
         {rankingFinal.map((item, idx) => {
           const isWinner = idx === 0
           const isMe = item.id === miId
@@ -93,7 +93,7 @@ export function FinalRanking({ rankingFinal, miId, isHost, onPlayAgain }: FinalR
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.3 + idx * 0.1, type: 'spring', stiffness: 300, damping: 25 }}
-              style={{ padding: '16px', borderRadius: 'var(--radius-xl)', backgroundColor: isWinner ? 'var(--bg-surface)' : 'var(--bg-secondary)', boxShadow: isWinner ? 'var(--shadow-md), 0 0 20px rgba(255,200,50,0.15)' : 'none', border: isWinner ? '1px solid rgba(255,200,50,0.3)' : 'none', transform: isWinner ? 'scale(1.04)' : 'scale(1)' }}
+              style={{ padding: '16px', borderRadius: 'var(--radius-xl)', backgroundColor: isWinner ? 'var(--bg-surface)' : 'var(--bg-secondary)', boxShadow: isWinner ? 'var(--shadow-md)' : 'var(--shadow-sm)', border: isWinner ? '2px solid var(--accent)' : '1px solid var(--bg-surface)', transform: isWinner ? 'scale(1.04)' : 'scale(1)' }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', color: isWinner ? 'var(--accent)' : 'var(--text-primary)' }}>
@@ -105,7 +105,7 @@ export function FinalRanking({ rankingFinal, miId, isHost, onPlayAgain }: FinalR
                 </span>
               </div>
               <div style={{ height: '4px', backgroundColor: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: barWidth, backgroundColor: isWinner ? 'var(--accent)' : 'var(--text-muted)', borderRadius: '2px', transition: 'width 0.6s ease-out' }} />
+                <div style={{ height: '100%', width: barWidth, backgroundColor: isWinner ? 'var(--accent)' : 'var(--text-muted)', borderRadius: '2px', transition: 'width var(--transition-normal)' }} />
               </div>
             </motion.div>
           )
@@ -117,7 +117,7 @@ export function FinalRanking({ rankingFinal, miId, isHost, onPlayAgain }: FinalR
         <Button
           ref={playAgainRef}
           size="lg"
-          style={{ width: '100%', maxWidth: '400px', transformOrigin: 'center' }}
+          style={{ width: '100%', maxWidth: '520px', transformOrigin: 'center', boxShadow: 'var(--shadow-lg)', fontFamily: 'var(--font-display)' }}
           onClick={handlePlayAgain}
         >
           {confirmando ? '¿Seguro? Jugáis de nuevo →' : '🔄 Jugar otra vez'}

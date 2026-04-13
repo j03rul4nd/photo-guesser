@@ -83,15 +83,16 @@ export function SalaPage() {
         padding: '32px 24px',
       }}
     >
-      <div ref={formRef} style={{ width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div ref={formRef} style={{ width: '100%', maxWidth: '390px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div>
           <h1
             style={{
               fontFamily: 'var(--font-display)',
               fontWeight: 800,
-              fontSize: '1.6rem',
+              fontSize: 'clamp(1.8rem, 7vw, 2.3rem)',
               margin: '0 0 4px',
               color: 'var(--text-primary)',
+              letterSpacing: '-0.02em',
             }}
           >
             Unirse a la sala
@@ -108,7 +109,7 @@ export function SalaPage() {
           </p>
         </div>
 
-        {/* Código readonly */}
+        {/* Código readonly — protagonista absoluto */}
         <div>
           <label
             style={{
@@ -116,7 +117,7 @@ export function SalaPage() {
               fontFamily: 'var(--font-ui)',
               fontSize: '0.75rem',
               color: 'var(--text-muted)',
-              marginBottom: '6px',
+              marginBottom: '8px',
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
             }}
@@ -127,13 +128,19 @@ export function SalaPage() {
             style={{
               fontFamily: 'var(--font-mono)',
               fontWeight: 700,
-              fontSize: '1.8rem',
+              fontSize: 'clamp(1.8rem, 6vw, 2rem)',
               letterSpacing: '0.15em',
               color: 'var(--text-primary)',
-              backgroundColor: 'var(--bg-secondary)',
+              backgroundColor: 'var(--bg-surface)',
               borderRadius: 'var(--radius-md)',
-              padding: '12px 16px',
-              border: '2px solid var(--bg-secondary)',
+              padding: '16px 20px',
+              border: '2px solid var(--text-primary)',
+              textAlign: 'center',
+              minHeight: '64px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: 'var(--shadow-photo)',
             }}
           >
             {code.toUpperCase()}
@@ -171,13 +178,14 @@ export function SalaPage() {
               fontSize: '1rem',
               color: 'var(--text-primary)',
               backgroundColor: 'var(--bg-surface)',
-              border: `2px solid ${error ? 'var(--incorrect)' : 'var(--bg-secondary)'}`,
+              border: `2px solid ${error ? 'var(--incorrect)' : 'var(--text-primary)'}`,
               borderRadius: 'var(--radius-md)',
-              padding: '12px 16px',
+              padding: '14px 16px',
               outline: 'none',
-              minHeight: '48px',
+              minHeight: '52px',
               boxSizing: 'border-box',
               transition: 'border-color var(--transition-fast)',
+              boxShadow: 'var(--shadow-sm)',
             }}
             onFocus={(e) => {
               if (!error) e.currentTarget.style.borderColor = 'var(--accent)'
@@ -195,7 +203,7 @@ export function SalaPage() {
 
         <PrivacyNotice />
 
-        <Button size="lg" style={{ width: '100%' }} onClick={() => void handleSubmit()}>
+        <Button size="lg" style={{ width: '100%', boxShadow: 'var(--shadow-md)', fontFamily: 'var(--font-display)' }} onClick={() => void handleSubmit()}>
           Entrar →
         </Button>
       </div>

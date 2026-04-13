@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { PolaroidFrame } from '@/components/shared/PolaroidFrame'
 import { Timer } from './Timer'
 import { AnswerOptions } from './AnswerOptions'
@@ -33,6 +33,7 @@ export function GameRound({ miId, onAnswer, onTimerExpire, startTimeRef }: GameR
   const questionRef = useRef<HTMLHeadingElement>(null)
   const optionsRef = useRef<HTMLDivElement>(null)
   const prevRondaNum = useRef<number>(0)
+  const [isDesktop, setIsDesktop] = useState(false)
 
   // Sprint 4.2 — Timeline del reveal de foto
   useEffect(() => {
@@ -50,6 +51,13 @@ export function GameRound({ miId, onAnswer, onTimerExpire, startTimeRef }: GameR
       )
     }
   }, [fotoActual?.rondaNum, faseRonda, esMiFoto])
+
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 1024)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   const handleSelect = useCallback(
     (opcion: string) => {
@@ -113,29 +121,50 @@ export function GameRound({ miId, onAnswer, onTimerExpire, startTimeRef }: GameR
 
       {/* Juego normal con reveal animado */}
       {showGame && !esMiFoto && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px', gap: '20px', maxWidth: '520px', margin: '0 auto', width: '100%', position: 'relative', zIndex: 1 }}>
-          {/* Foto */}
-          <div ref={photoRef} style={{ display: 'flex', justifyContent: 'center', opacity: 0 }}>
-            <PolaroidFrame style={{ maxWidth: '280px', width: '100%' }}>
-              <img src={fotoActual.url} alt="¿De quién es esta foto?" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }} />
-            </PolaroidFrame>
-          </div>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: isDesktop ? 'minmax(0, 1fr) 260px' : 'minmax(0, 1fr)', padding: '20px', gap: '20px', maxWidth: '980px', margin: '0 auto', width: '100%', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Foto */}
+            <div ref={photoRef} style={{ display: 'flex', justifyContent: 'center', opacity: 0 }}>
+              <PolaroidFrame style={{ maxWidth: '520px', width: '100%' }}>
+                <img src={fotoActual.url} alt="¿De quién es esta foto?" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }} />
+              </PolaroidFrame>
+            </div>
 
-          {/* Pregunta */}
-          <h2 ref={questionRef} style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.2rem', color: 'var(--text-primary)', margin: 0, textAlign: 'center', opacity: 0 }}>
-            ¿De quién es esta foto?
-          </h2>
+            {/* Pregunta */}
+            <h2 ref={questionRef} style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(1.2rem, 3vw, 1.8rem)', color: 'var(--text-primary)', margin: 0, textAlign: 'center', opacity: 0 }}>
+              ¿De quién es esta foto?
+            </h2>
 
-          {/* Opciones */}
-          <div ref={optionsRef}>
-            <AnswerOptions
-              opciones={fotoActual.opciones}
-              seleccionada={respuestaSeleccionada}
-              correctas={respuestasCorrectas}
-              faseRonda={faseRonda === 'idle' ? 'showing' : faseRonda}
-              onSelect={handleSelect}
-            />
+            {/* Opciones */}
+            <div ref={optionsRef}>
+              <AnswerOptions
+                opciones={fotoActual.opciones}
+                seleccionada={respuestaSeleccionada}
+                correctas={respuestasCorrectas}
+                faseRonda={faseRonda === 'idle' ? 'showing' : faseRonda}
+                onSelect={handleSelect}
+              />
+            </div>
           </div>
+          {isDesktop && (
+            <aside style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--bg-secondary)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)', padding: '14px', alignSelf: 'start' }}>
+              <p style={{ margin: '0 0 10px', fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Ranking en vivo
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {rankingActual.slice(0, 5).map((item, idx) => (
+                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', borderLeft: `4px solid ${idx === 0 ? 'var(--accent)' : 'var(--bg-secondary)'}`, backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '8px 10px' }}>
+                    <span style={{ fontFamily: 'var(--font-ui)', fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.84rem' }}>
+                      {idx + 1}. {item.nickname}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.8rem' }}>
+                      {item.puntosTotal}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </aside>
+          )}
         </div>
       )}
     </div>

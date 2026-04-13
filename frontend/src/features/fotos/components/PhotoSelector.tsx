@@ -136,9 +136,10 @@ export function PhotoSelector({ salaCode, jugadorId, onConfirm, onClose }: Photo
           style={{
             fontFamily: 'var(--font-display)',
             fontWeight: 800,
-            fontSize: '1.1rem',
+            fontSize: '1.3rem',
             margin: 0,
             color: 'var(--text-primary)',
+            letterSpacing: '-0.01em',
           }}
         >
           Tus fotos
@@ -169,8 +170,8 @@ export function PhotoSelector({ salaCode, jugadorId, onConfirm, onClose }: Photo
           padding: '20px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '20px',
-          maxWidth: '480px',
+          gap: '22px',
+          maxWidth: '560px',
           margin: '0 auto',
           width: '100%',
         }}
@@ -212,7 +213,7 @@ export function PhotoSelector({ salaCode, jugadorId, onConfirm, onClose }: Photo
           />
           <Button
             variant="secondary"
-            style={{ flex: 1 }}
+            style={{ flex: 1, border: '2px solid var(--text-primary)', boxShadow: 'var(--shadow-sm)', fontWeight: 700 }}
             onClick={() => manualInputRef.current?.click()}
             disabled={fotos.length >= MAX_FOTOS}
           >
@@ -257,7 +258,7 @@ export function PhotoSelector({ salaCode, jugadorId, onConfirm, onClose }: Photo
       >
         <Button
           size="lg"
-          style={{ width: '100%' }}
+          style={{ width: '100%', boxShadow: 'var(--shadow-lg)', fontFamily: 'var(--font-display)' }}
           disabled={fotos.length < MIN_FOTOS}
           onClick={() => void handleConfirmar()}
         >
