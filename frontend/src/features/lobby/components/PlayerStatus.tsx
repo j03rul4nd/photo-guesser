@@ -1,4 +1,7 @@
+import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
+import { CheckCircleIcon, HourglassIcon, XCircleIcon } from '@phosphor-icons/react'
+import { InViewReveal, ShinyText } from '@/components/shared/Kinetic'
 import type { Jugador } from '@shared/schemas'
 
 interface PlayerStatusProps {
@@ -13,17 +16,37 @@ function getEstadoColor(jugador: Jugador): string {
   return 'var(--text-muted)'
 }
 
-function getEstadoLabel(jugador: Jugador): string {
-  if (!jugador.conectado) return '❌ Desconectado'
-  if (jugador.fotosListas) return '✅ Fotos listas'
-  return '⏳ Eligiendo...'
+function getEstadoLabel(jugador: Jugador): ReactNode {
+  if (!jugador.conectado) {
+    return (
+      <>
+        <XCircleIcon size={16} weight="fill" aria-hidden="true" />
+        Desconectado
+      </>
+    )
+  }
+  if (jugador.fotosListas) {
+    return (
+      <>
+        <CheckCircleIcon size={16} weight="fill" aria-hidden="true" />
+        Fotos listas
+      </>
+    )
+  }
+  return (
+    <>
+      <HourglassIcon size={16} weight="duotone" aria-hidden="true" />
+      Eligiendo...
+    </>
+  )
 }
 
 export function PlayerStatus({ jugador, isHost, isMe }: PlayerStatusProps) {
   const borderColor = getEstadoColor(jugador)
 
   return (
-    <motion.div
+    <InViewReveal>
+      <motion.div
       layout
       style={{
         padding: '14px 16px',
@@ -37,7 +60,7 @@ export function PlayerStatus({ jugador, isHost, isMe }: PlayerStatusProps) {
         alignItems: 'center',
         transition: 'border-color var(--transition-normal)',
       }}
-    >
+      >
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span
           style={{
@@ -68,7 +91,7 @@ export function PlayerStatus({ jugador, isHost, isMe }: PlayerStatusProps) {
               letterSpacing: '0.06em',
             }}
           >
-            Host
+            <ShinyText text="Host" style={{ color: 'var(--accent)' }} />
           </span>
         )}
       </div>
@@ -76,10 +99,11 @@ export function PlayerStatus({ jugador, isHost, isMe }: PlayerStatusProps) {
       <motion.span
         animate={{ color: borderColor }}
         transition={{ duration: 0.2 }}
-        style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: borderColor }}
+        style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: borderColor, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
       >
         {getEstadoLabel(jugador)}
       </motion.span>
-    </motion.div>
+      </motion.div>
+    </InViewReveal>
   )
 }

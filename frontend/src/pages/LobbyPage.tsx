@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { GameControllerIcon, ImagesIcon } from '@phosphor-icons/react'
 import { Copy, Check, Wifi, WifiOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Magnet, WordFadeIn } from '@/components/shared/Kinetic'
 import { PlayerList } from '@/features/lobby/components/PlayerList'
 import { PhotoSelector } from '@/features/fotos/components/PhotoSelector'
 import { useLobbyStore } from '@/features/lobby/store/lobbySlice'
@@ -111,18 +113,30 @@ export function LobbyPage() {
 
         <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <Button variant="secondary" style={{ width: '100%', border: '2px solid var(--text-primary)', boxShadow: 'var(--shadow-sm)', fontWeight: 700 }} onClick={() => setShowSelector(true)}>
-            📸 Elegir mis fotos
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <ImagesIcon size={18} weight="duotone" aria-hidden="true" />
+              Elegir mis fotos
+            </span>
           </Button>
 
           {isHost && (
-            <Button size="lg" style={{ width: '100%', boxShadow: puedeIniciar ? 'var(--shadow-lg)' : 'none', fontFamily: 'var(--font-display)', letterSpacing: '0.01em' }} disabled={!puedeIniciar} onClick={() => sendMessage({ type: 'START_GAME' })}>
-              {puedeIniciar ? '🎮 Iniciar partida' : `Esperando fotos (${listosCount}/2 mínimo)`}
-            </Button>
+            <Magnet>
+              <Button size="lg" style={{ width: '100%', boxShadow: puedeIniciar ? 'var(--shadow-lg)' : 'none', fontFamily: 'var(--font-display)', letterSpacing: '0.01em' }} disabled={!puedeIniciar} onClick={() => sendMessage({ type: 'START_GAME' })}>
+                {puedeIniciar ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <GameControllerIcon size={18} weight="duotone" aria-hidden="true" />
+                    Iniciar partida
+                  </span>
+                ) : (
+                  `Esperando fotos (${listosCount}/2 mínimo)`
+                )}
+              </Button>
+            </Magnet>
           )}
 
           {!isHost && (
             <p style={{ fontFamily: 'var(--font-body)', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.9rem' }}>
-              El host iniciará la partida cuando todos estén listos
+              <WordFadeIn text="El host iniciará la partida cuando todos estén listos" />
             </p>
           )}
         </div>

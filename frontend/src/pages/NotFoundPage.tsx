@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { CameraIcon } from '@phosphor-icons/react'
 import { PolaroidFrame } from '@/components/shared/PolaroidFrame'
 import { Button } from '@/components/ui/button'
 
@@ -14,7 +15,7 @@ export function NotFoundPage({ message }: { message?: string }) {
       {/* Polaroid en blanco */}
       <PolaroidFrame style={{ width: '180px' }}>
         <div style={{ width: '100%', aspectRatio: '1', backgroundColor: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: '3rem', opacity: 0.3 }}>📷</span>
+          <CameraIcon size={64} weight="duotone" color="var(--text-muted)" aria-hidden="true" />
         </div>
       </PolaroidFrame>
 

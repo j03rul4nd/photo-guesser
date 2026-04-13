@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { CubeIcon } from '@phosphor-icons/react'
 
 interface RandomPickBtnProps {
   onPick: (files: File[]) => void
@@ -86,10 +87,10 @@ export function RandomPickBtn({ onPick, disabled }: RandomPickBtnProps) {
       >
         <span
           ref={diceRef}
-          style={{ fontSize: '2.1rem', display: 'inline-block' }}
+          style={{ display: 'inline-flex' }}
           aria-hidden="true"
         >
-          🎲
+          <CubeIcon size={34} weight="duotone" color="currentColor" />
         </span>
         Elegir 10 fotos al azar
       </button>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { LoadingReveal } from '@/components/shared/LoadingReveal'
+import { BlurWords, InViewReveal, Magnet, ShinyText } from '@/components/shared/Kinetic'
 import { api } from '@/lib/api'
 import { animateHomeEntrance } from '@/lib/animations'
 
@@ -50,30 +51,30 @@ export function HomePage() {
     <div style={{ minHeight: '100dvh', backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative', overflow: 'hidden' }}>
       {/* Siluetas Polaroid de fondo — marcos físicos blancos */}
       {siluetas.map((s, i) => (
-        <div
-          key={i}
-          ref={(el) => { if (el) polaroidRefs.current[i] = el }}
-          className="decorative-animation"
-          style={{
-            position: 'absolute',
-            top: s.top,
-            left: 'left' in s ? s.left : undefined,
-            right: 'right' in s ? s.right : undefined,
-            bottom: 'bottom' in s ? s.bottom : undefined,
-            width: s.width,
-            transform: `rotate(${s.rotate})`,
-            opacity: 0.08,
-            backgroundColor: 'var(--bg-surface)',
-            borderRadius: 'var(--radius-photo)',
-            padding: '12px',
-            paddingBottom: '32px',
-            boxShadow: 'var(--shadow-sm)',
-            pointerEvents: 'none',
-          }}
-        >
-          {/* Área de la foto */}
-          <div style={{ width: '100%', aspectRatio: '1', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-photo)' }} />
-        </div>
+        <InViewReveal key={i} delay={i * 0.08}>
+          <div
+            ref={(el) => { if (el) polaroidRefs.current[i] = el }}
+            className="decorative-animation"
+            style={{
+              position: 'absolute',
+              top: s.top,
+              left: 'left' in s ? s.left : undefined,
+              right: 'right' in s ? s.right : undefined,
+              bottom: 'bottom' in s ? s.bottom : undefined,
+              width: s.width,
+              transform: `rotate(${s.rotate})`,
+              opacity: 0.08,
+              backgroundColor: 'var(--bg-surface)',
+              borderRadius: 'var(--radius-photo)',
+              padding: '12px',
+              paddingBottom: '32px',
+              boxShadow: 'var(--shadow-sm)',
+              pointerEvents: 'none',
+            }}
+          >
+            <div style={{ width: '100%', aspectRatio: '1', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-photo)' }} />
+          </div>
+        </InViewReveal>
       ))}
 
       {/* Contenido */}
@@ -92,7 +93,7 @@ export function HomePage() {
           textWrap: 'balance',
           textShadow: '2px 2px 0 var(--bg-secondary)',
         }}>
-          PHOTO<br /><span style={{ color: 'var(--accent)' }}>GUESSER</span>
+          PHOTO<br /><ShinyText text="GUESSER" style={{ color: 'var(--accent)' }} />
         </h1>
 
         {/* Tagline en serif para contraste editorial */}
@@ -106,7 +107,7 @@ export function HomePage() {
           fontWeight: 400,
           maxWidth: '28ch',
         }}>
-          ¿cuánto conoces a tus amigos?
+          <BlurWords text="¿cuánto conoces a tus amigos?" />
         </p>
 
         {/* Mensaje de error si existe */}
@@ -119,19 +120,21 @@ export function HomePage() {
         {/* Botones con clara jerarquía visual */}
         <div ref={buttonsRef} style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
           {/* CTA principal — "Crear partida" con sombra pronunciada */}
-          <Button
-            size="lg"
-            style={{
-              width: '100%',
-              boxShadow: 'var(--shadow-lg)',
-              fontFamily: 'var(--font-display)',
-              letterSpacing: '0.01em',
-              fontSize: '1.05rem',
-            }}
-            onClick={() => void handleCrear()}
-          >
-            Crear partida
-          </Button>
+          <Magnet>
+            <Button
+              size="lg"
+              style={{
+                width: '100%',
+                boxShadow: 'var(--shadow-lg)',
+                fontFamily: 'var(--font-display)',
+                letterSpacing: '0.01em',
+                fontSize: '1.05rem',
+              }}
+              onClick={() => void handleCrear()}
+            >
+              Crear partida
+            </Button>
+          </Magnet>
           {/* CTA secundaria — "Unirse a partida" con borde claro */}
           <Button
             size="lg"

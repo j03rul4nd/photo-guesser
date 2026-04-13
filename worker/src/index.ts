@@ -35,7 +35,13 @@ const app = new Hono<{ Bindings: Env }>()
 app.use(
   '/api/*',
   cors({
-    origin: ['http://localhost:5173', 'https://*.pages.dev'],
+    origin: (origin) => {
+      if (!origin) return ''
+      if (origin === 'http://localhost:5173') return origin
+      if (origin === 'https://photo-guesser.pages.dev') return origin
+      if (/^https:\/\/[a-z0-9-]+\.pages\.dev$/i.test(origin)) return origin
+      return ''
+    },
     allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type'],
   }),

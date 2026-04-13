@@ -193,3 +193,13 @@ button, [role="button"] {
 html {
   scroll-behavior: smooth;
 }
+
+@keyframes kinetic-shine {
+  0% { background-position: 200% 0; }
+  100% { background-position: -60% 0; }
+}
+
+@keyframes sparkle-float {
+  0%, 100% { transform: translateY(0) scale(0.9); opacity: 0.45; }
+  50% { transform: translateY(-4px) scale(1.05); opacity: 1; }
+}

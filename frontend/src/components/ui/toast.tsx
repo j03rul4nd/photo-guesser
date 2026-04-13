@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react'
 import { useEffect, useRef } from 'react'
+import { CheckCircleIcon, InfoIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { create } from 'zustand'
@@ -45,10 +47,10 @@ export const toast = {
 
 // ─── Componente Toast individual ──────────────────────────────────────────────
 
-const VARIANT_STYLES: Record<ToastVariant, { border: string; icon: string }> = {
-  error:   { border: 'var(--incorrect)', icon: '⚠' },
-  success: { border: 'var(--correct)',   icon: '✓' },
-  info:    { border: 'var(--pending)',   icon: 'ℹ' },
+const VARIANT_STYLES: Record<ToastVariant, { border: string; icon: ReactNode }> = {
+  error: { border: 'var(--incorrect)', icon: <WarningCircleIcon size={18} weight="fill" aria-hidden="true" /> },
+  success: { border: 'var(--correct)', icon: <CheckCircleIcon size={18} weight="fill" aria-hidden="true" /> },
+  info: { border: 'var(--pending)', icon: <InfoIcon size={18} weight="fill" aria-hidden="true" /> },
 }
 
 function ToastItem({ toast: t }: { toast: Toast }) {
@@ -81,7 +83,7 @@ function ToastItem({ toast: t }: { toast: Toast }) {
         width: '100%',
       }}
     >
-      <span style={{ color: styles.border, fontSize: '1rem', flexShrink: 0 }}>{styles.icon}</span>
+      <span style={{ color: styles.border, fontSize: '1rem', flexShrink: 0, display: 'inline-flex' }}>{styles.icon}</span>
       <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-primary)', margin: 0, flex: 1, lineHeight: 1.4 }}>
         {t.message}
       </p>

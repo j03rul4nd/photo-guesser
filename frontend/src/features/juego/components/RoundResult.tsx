@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
+import { CheckCircleIcon, EyeIcon } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatedNumber, InViewReveal, SplitText } from '@/components/shared/Kinetic'
 import type { RankingItem } from '@shared/schemas'
 import { animateRoundResult, burstConfetti } from '@/lib/animations'
 
@@ -43,7 +45,7 @@ export function RoundResult({ propietarioNickname, respuestasCorrectas, puntosGa
       {/* Propietario */}
       <div ref={ownerLabelRef} style={{ textAlign: 'center', padding: '20px 16px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-photo)', border: '2px solid var(--text-primary)' }}>
         <p style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(1.6rem, 6vw, 2.3rem)', margin: '0 0 4px', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-          Era de <span style={{ color: 'var(--accent)' }}>{propietarioNickname}</span>
+          Era de <span style={{ color: 'var(--accent)' }}><SplitText text={propietarioNickname} /></span>
         </p>
         <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-muted)', margin: 0 }}>
           Ronda {rondaActual} de {totalRondas}
@@ -55,18 +57,24 @@ export function RoundResult({ propietarioNickname, respuestasCorrectas, puntosGa
         <div ref={correctOptRef} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Acertaron</p>
           {rankingActual.filter((r) => respuestasCorrectas.includes(r.id)).map((r, i) => (
-            <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', backgroundColor: 'var(--correct-bg)', border: '2px solid var(--correct)', borderRadius: 'var(--radius-md)' }}>
+            <InViewReveal key={r.id} delay={i * 0.06}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', backgroundColor: 'var(--correct-bg)', border: '2px solid var(--correct)', borderRadius: 'var(--radius-md)' }}>
               <span style={{ fontFamily: 'var(--font-ui)', fontWeight: 500, color: 'var(--correct)' }}>
+                <CheckCircleIcon size={15} weight="fill" style={{ marginRight: '6px', verticalAlign: 'text-bottom' }} aria-hidden="true" />
                 {r.nickname} {r.id === miId && '(tú)'}
               </span>
               <span ref={(el) => { if (el) scoreFloatsRef.current[i] = el }} style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--correct)' }}>
-                +{puntosGanados[r.id] ?? 0}
+                +<AnimatedNumber value={puntosGanados[r.id] ?? 0} />
               </span>
-            </div>
+              </div>
+            </InViewReveal>
           ))}
         </div>
       ) : (
-        <p style={{ fontFamily: 'var(--font-body)', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>Nadie acertó esta ronda 👀</p>
+        <p style={{ fontFamily: 'var(--font-body)', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center', margin: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          <EyeIcon size={18} weight="duotone" color="var(--text-muted)" aria-hidden="true" />
+          Nadie acertó esta ronda
+        </p>
       )}
 
       {/* Ranking con Motion layout */}
@@ -86,9 +94,9 @@ export function RoundResult({ propietarioNickname, respuestasCorrectas, puntosGa
                 {idx + 1}. {item.nickname} {item.id === miId && '(tú)'}
               </span>
               <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                {item.puntosTotal} pts
+                <AnimatedNumber value={item.puntosTotal} /> pts
                 {(puntosGanados[item.id] ?? 0) > 0 && (
-                  <span style={{ color: 'var(--correct)', marginLeft: '4px', fontSize: '0.75rem' }}>+{puntosGanados[item.id]}</span>
+                  <span style={{ color: 'var(--correct)', marginLeft: '4px', fontSize: '0.75rem' }}>+<AnimatedNumber value={puntosGanados[item.id]} /></span>
                 )}
               </span>
             </motion.div>

@@ -4,6 +4,7 @@
  * ELIMINAR antes de la Fase 2.
  */
 import { useState } from 'react'
+import { CheckCircleIcon, CubeIcon, HourglassIcon, MoonIcon, SunIcon, XCircleIcon } from '@phosphor-icons/react'
 import { PolaroidFrame } from '@/components/shared/PolaroidFrame'
 import { LoadingReveal } from '@/components/shared/LoadingReveal'
 import { Button } from '@/components/ui/button'
@@ -102,7 +103,17 @@ export function DesignSystemPage() {
             minHeight: '44px',
           }}
         >
-          {darkMode ? '☀️ Light' : '🌙 Dark'}
+          {darkMode ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <SunIcon size={14} weight="duotone" aria-hidden="true" />
+              Light
+            </span>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <MoonIcon size={14} weight="duotone" aria-hidden="true" />
+              Dark
+            </span>
+          )}
         </button>
       </div>
 
@@ -194,7 +205,7 @@ export function DesignSystemPage() {
               backgroundColor: 'var(--bg-secondary)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <span style={{ fontSize: '2rem' }}>🏖️</span>
+              <span style={{ fontSize: '2rem' }}>IMG</span>
             </div>
           </PolaroidFrame>
 
@@ -236,7 +247,10 @@ export function DesignSystemPage() {
             <Button disabled>Deshabilitado</Button>
           </div>
           <Button style={{ width: '100%' }}>
-            🎲 Elegir 10 fotos al azar
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <CubeIcon size={18} weight="duotone" aria-hidden="true" />
+              Elegir 10 fotos al azar
+            </span>
           </Button>
         </div>
       </Section>
@@ -256,7 +270,7 @@ export function DesignSystemPage() {
           </Card>
 
           {/* Card de jugador en lobby */}
-          {(['✅ Fotos listas', '⏳ Eligiendo...', '❌ Desconectado'] as const).map((estado, i) => (
+          {(['Fotos listas', 'Eligiendo...', 'Desconectado'] as const).map((estado, i) => (
             <div key={i} style={{
               padding: '12px 16px',
               borderRadius: 'var(--radius-xl)',
@@ -271,6 +285,11 @@ export function DesignSystemPage() {
                 {['Ana', 'Carlos', 'María'][i]}
               </span>
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{estado}</span>
+              <span style={{ display: 'inline-flex' }}>
+                {i === 0 && <CheckCircleIcon size={16} weight="fill" aria-hidden="true" />}
+                {i === 1 && <HourglassIcon size={16} weight="duotone" aria-hidden="true" />}
+                {i === 2 && <XCircleIcon size={16} weight="fill" aria-hidden="true" />}
+              </span>
             </div>
           ))}
         </div>
@@ -283,7 +302,12 @@ export function DesignSystemPage() {
           <Badge variant="secondary">Host</Badge>
           <Badge variant="correct">+100</Badge>
           <Badge variant="incorrect">Incorrecto</Badge>
-          <Badge variant="pending">⏳ Timer</Badge>
+          <Badge variant="pending">
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <HourglassIcon size={14} weight="duotone" aria-hidden="true" />
+              Timer
+            </span>
+          </Badge>
         </div>
       </Section>
 
@@ -348,7 +372,7 @@ export function DesignSystemPage() {
             fontWeight: 500,
             cursor: 'pointer',
           }}>
-            Carlos Pérez ✓
+            Carlos Pérez
           </button>
 
           {/* Correcta */}
@@ -363,7 +387,7 @@ export function DesignSystemPage() {
             fontWeight: 500,
             cursor: 'pointer',
           }}>
-            María López ✓
+            María López
           </button>
 
           {/* Incorrecta */}
@@ -379,7 +403,7 @@ export function DesignSystemPage() {
             opacity: 0.5,
             cursor: 'pointer',
           }}>
-            Juan Torres ✗
+            Juan Torres
           </button>
         </div>
       </Section>
@@ -394,7 +418,7 @@ export function DesignSystemPage() {
         color: 'var(--text-muted)',
         textAlign: 'center',
       }}>
-        Design System v2.0 — Sprint 1.2 ✓ — Eliminar antes de Fase 2
+        Design System v2.0 — Sprint 1.2 — Eliminar antes de Fase 2
       </div>
     </div>
   )

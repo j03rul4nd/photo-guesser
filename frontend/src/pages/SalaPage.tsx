@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { ArrowRightIcon } from '@phosphor-icons/react'
 import { shakeElement } from '@/lib/animations'
 import { Button } from '@/components/ui/button'
 import { ShareRoom } from '@/features/sala/components/ShareRoom'
@@ -204,7 +205,10 @@ export function SalaPage() {
         <PrivacyNotice />
 
         <Button size="lg" style={{ width: '100%', boxShadow: 'var(--shadow-md)', fontFamily: 'var(--font-display)' }} onClick={() => void handleSubmit()}>
-          Entrar →
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+            Entrar
+            <ArrowRightIcon size={16} weight="bold" aria-hidden="true" />
+          </span>
         </Button>
       </div>
     </div>

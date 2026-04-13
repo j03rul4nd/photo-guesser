@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ArrowLeftIcon, ArrowRightIcon } from '@phosphor-icons/react'
 import { shakeElement } from '@/lib/animations'
 import { Button } from '@/components/ui/button'
 import { PrivacyNotice } from '@/features/sala/components/PrivacyNotice'
@@ -228,7 +229,10 @@ export function JoinPage() {
           disabled={!code.trim() || !nickname.trim()}
           onClick={() => void handleSubmit()}
         >
-          Entrar →
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+            Entrar
+            <ArrowRightIcon size={16} weight="bold" aria-hidden="true" />
+          </span>
         </Button>
 
         <button
@@ -243,7 +247,10 @@ export function JoinPage() {
             minHeight: '44px',
           }}
         >
-          ← Volver al inicio
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+            <ArrowLeftIcon size={14} weight="bold" aria-hidden="true" />
+            Volver al inicio
+          </span>
         </button>
       </div>
     </div>

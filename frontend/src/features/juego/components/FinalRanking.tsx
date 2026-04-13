@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { ArrowsClockwiseIcon, ArrowRightIcon, MedalIcon, TrophyIcon } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { gsap } from 'gsap'
 import { Button } from '@/components/ui/button'
+import { AnimatedNumber, InViewReveal, SparklesText, SplitText, TiltCard } from '@/components/shared/Kinetic'
 import { animateFinalScreen, burstConfetti } from '@/lib/animations'
 
 interface FinalRankingItem {
@@ -64,11 +66,16 @@ export function FinalRanking({ rankingFinal, miId, isHost, onPlayAgain }: FinalR
     <div style={{ minHeight: '100dvh', backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 24px', gap: '32px' }}>
       {/* Título */}
       <div ref={titleRef} style={{ textAlign: 'center', opacity: 0 }}>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(2.2rem, 12vw, 4.8rem)', color: 'var(--accent)', margin: '0 0 0', lineHeight: 0.92, letterSpacing: '-0.03em' }}>FIN DE LA</h1>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(2.2rem, 12vw, 4.8rem)', color: 'var(--text-primary)', margin: 0, lineHeight: 0.92, letterSpacing: '-0.03em' }}>PARTIDA</h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(2.2rem, 12vw, 4.8rem)', color: 'var(--accent)', margin: '0 0 0', lineHeight: 0.92, letterSpacing: '-0.03em' }}>
+          <SplitText text="FIN DE LA" />
+        </h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(2.2rem, 12vw, 4.8rem)', color: 'var(--text-primary)', margin: 0, lineHeight: 0.92, letterSpacing: '-0.03em' }}>
+          <SplitText text="PARTIDA" delay={0.15} />
+        </h1>
         {ganador && (
           <p style={{ fontFamily: 'var(--font-body)', fontStyle: 'italic', color: 'var(--text-secondary)', marginTop: '8px' }}>
-            Ganador: <strong>{ganador.nickname}</strong> 🏆
+            Ganador: <strong><SparklesText text={ganador.nickname} color="rgba(255, 200, 50, 0.9)" /></strong>{' '}
+            <TrophyIcon size={18} weight="duotone" color="rgba(255, 200, 50, 0.9)" style={{ verticalAlign: 'text-bottom' }} aria-hidden="true" />
           </p>
         )}
       </div>
@@ -81,7 +88,7 @@ export function FinalRanking({ rankingFinal, miId, isHost, onPlayAgain }: FinalR
           const maxPuntos = rankingFinal[0]?.puntosTotal ?? 1
           const barWidth = `${Math.round((item.puntosTotal / maxPuntos) * 100)}%`
 
-          return (
+          const card = (
             <motion.div
               key={item.id}
               ref={(el) => {
@@ -97,17 +104,27 @@ export function FinalRanking({ rankingFinal, miId, isHost, onPlayAgain }: FinalR
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', color: isWinner ? 'var(--accent)' : 'var(--text-primary)' }}>
-                  {isWinner ? '🏆' : `${idx + 1}.`} {item.nickname}
+                  {isWinner ? (
+                    <TrophyIcon size={20} weight="duotone" color="rgba(255, 200, 50, 0.9)" style={{ verticalAlign: 'text-bottom', marginRight: '6px' }} aria-hidden="true" />
+                  ) : (idx < 3 ? (
+                    <MedalIcon size={20} weight="duotone" color="var(--text-muted)" style={{ verticalAlign: 'text-bottom', marginRight: '6px' }} aria-hidden="true" />
+                  ) : `${idx + 1}. `)}
+                  {item.nickname}
                   {isMe && <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.8rem', marginLeft: '6px' }}>(tú)</span>}
                 </span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '1rem', color: isWinner ? 'var(--accent)' : 'var(--text-primary)' }}>
-                  {item.puntosTotal} pts
+                  <AnimatedNumber value={item.puntosTotal} /> pts
                 </span>
               </div>
               <div style={{ height: '4px', backgroundColor: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: barWidth, backgroundColor: isWinner ? 'var(--accent)' : 'var(--text-muted)', borderRadius: '2px', transition: 'width var(--transition-normal)' }} />
               </div>
             </motion.div>
+          )
+          return (
+            <InViewReveal key={item.id} delay={idx * 0.08} y={28}>
+              {isWinner ? <TiltCard>{card}</TiltCard> : card}
+            </InViewReveal>
           )
         })}
       </div>
@@ -120,7 +137,17 @@ export function FinalRanking({ rankingFinal, miId, isHost, onPlayAgain }: FinalR
           style={{ width: '100%', maxWidth: '520px', transformOrigin: 'center', boxShadow: 'var(--shadow-lg)', fontFamily: 'var(--font-display)' }}
           onClick={handlePlayAgain}
         >
-          {confirmando ? '¿Seguro? Jugáis de nuevo →' : '🔄 Jugar otra vez'}
+          {confirmando ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              ¿Seguro? Jugáis de nuevo
+              <ArrowRightIcon size={16} weight="bold" aria-hidden="true" />
+            </span>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <ArrowsClockwiseIcon size={18} weight="bold" aria-hidden="true" />
+              Jugar otra vez
+            </span>
+          )}
         </Button>
       ) : (
         <p style={{ fontFamily: 'var(--font-body)', fontStyle: 'italic', color: 'var(--text-muted)', textAlign: 'center' }}>

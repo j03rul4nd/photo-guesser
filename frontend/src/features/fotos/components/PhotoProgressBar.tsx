@@ -1,3 +1,5 @@
+import { CheckIcon } from '@phosphor-icons/react'
+
 interface PhotoProgressBarProps {
   actual: number
   total?: number
@@ -43,7 +45,12 @@ export function PhotoProgressBar({ actual, total = 10 }: PhotoProgressBarProps) 
       >
         {actual < total
           ? `${actual} / ${total} fotos — faltan ${total - actual}`
-          : `✓ ${actual} fotos listas`}
+          : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <CheckIcon size={14} weight="bold" aria-hidden="true" />
+              {`${actual} fotos listas`}
+            </span>
+          )}
       </p>
     </div>
   )

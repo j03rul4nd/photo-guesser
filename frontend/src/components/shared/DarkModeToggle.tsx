@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { MoonIcon, SunIcon } from '@phosphor-icons/react'
 
 /**
  * DarkModeToggle — toggle de modo oscuro.
@@ -40,7 +41,7 @@ export function DarkModeToggle() {
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent)' }}
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--bg-secondary)' }}
     >
-      {isDark ? '☀️' : '🌙'}
+      {isDark ? <SunIcon size={18} weight="duotone" aria-hidden="true" /> : <MoonIcon size={18} weight="duotone" aria-hidden="true" />}
     </button>
   )
 }

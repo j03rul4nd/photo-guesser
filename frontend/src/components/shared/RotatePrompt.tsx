@@ -1,3 +1,5 @@
+import { DeviceMobileIcon } from '@phosphor-icons/react'
+
 /**
  * RotatePrompt — aviso de orientación para móvil en landscape.
  * Por defecto display: none. CSS lo muestra solo en landscape + mobile.
@@ -17,7 +19,7 @@ export function RotatePrompt() {
         }}
         aria-hidden="true"
       >
-        📱
+        <DeviceMobileIcon size={52} weight="duotone" color="var(--text-primary)" />
       </div>
 
       <div className="text-center space-y-2">

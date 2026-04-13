@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Copy, MessageCircle, Share2, Check } from 'lucide-react'
+import { ArrowRightIcon, CheckIcon, LinkSimpleIcon, ShareNetworkIcon, WhatsappLogoIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { ShinyText, TiltCard } from '@/components/shared/Kinetic'
 import { RoomQR } from './RoomQR'
 import { PrivacyNotice } from './PrivacyNotice'
 import { getSalaUrl, copyToClipboard, shareWhatsApp, canUseWebShare, webShare } from '@/lib/share'
@@ -45,34 +46,45 @@ export function ShareRoom({ codigo, onContinue }: ShareRoomProps) {
       <div ref={codeRef} style={{ backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', padding: '16px 18px 18px', boxShadow: 'var(--shadow-photo)', border: '2px solid var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', width: '100%' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 'clamp(2.1rem, 9vw, 3rem)', letterSpacing: '0.16em', color: 'var(--text-primary)' }}>
           {chars.map((char, i) => (
-            <span key={i} ref={(el) => { if (el) charsRef.current[i] = el }}>{char}</span>
+            <span key={i} ref={(el) => { if (el) charsRef.current[i] = el }}>
+              <ShinyText text={char} style={{ color: 'var(--accent)' }} />
+            </span>
           ))}
         </span>
         <button onClick={() => void handleCopy()} aria-label="Copiar código" style={{ backgroundColor: 'var(--bg-secondary)', border: '2px solid var(--text-primary)', cursor: 'pointer', color: copied ? 'var(--correct)' : 'var(--text-primary)', padding: '8px', borderRadius: 'var(--radius-sm)', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'color var(--transition-fast)' }}>
-          {copied ? <Check size={20} /> : <Copy size={20} />}
+          {copied ? <CheckIcon size={20} /> : <LinkSimpleIcon size={20} />}
         </button>
       </div>
 
       {/* QR */}
-      <div ref={qrRef}><RoomQR codigo={codigo} /></div>
+      <div ref={qrRef}>
+        <TiltCard max={5}>
+          <RoomQR codigo={codigo} />
+        </TiltCard>
+      </div>
 
       {/* Botones de compartir */}
       <div ref={buttonsRef} style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
         <Button onClick={() => shareWhatsApp(codigo)} style={{ backgroundColor: '#25D366', color: 'var(--bg-surface)', width: '100%', gap: '8px', boxShadow: 'var(--shadow-md)', fontWeight: 700 }}>
-          <MessageCircle size={18} />Compartir por WhatsApp
+          <WhatsappLogoIcon size={18} weight="fill" />Compartir por WhatsApp
         </Button>
         <Button variant="secondary" onClick={() => void handleCopy()} style={{ width: '100%', gap: '8px', border: '2px solid var(--text-primary)', boxShadow: 'var(--shadow-sm)' }}>
-          {copied ? <Check size={18} /> : <Copy size={18} />}{copied ? '¡Copiado!' : 'Copiar link'}
+          {copied ? <CheckIcon size={18} weight="bold" /> : <LinkSimpleIcon size={18} weight="duotone" />}{copied ? '¡Copiado!' : 'Copiar link'}
         </Button>
         {canUseWebShare() && (
           <Button variant="default" onClick={() => void webShare(codigo)} style={{ width: '100%', gap: '8px', boxShadow: 'var(--shadow-sm)' }}>
-            <Share2 size={18} />Compartir
+            <ShareNetworkIcon size={18} weight="duotone" />Compartir
           </Button>
         )}
       </div>
 
       <PrivacyNotice style={{ width: '100%' }} />
-      <Button onClick={onContinue} style={{ width: '100%', boxShadow: 'var(--shadow-lg)', fontFamily: 'var(--font-display)' }} size="lg">Entrar al lobby →</Button>
+      <Button onClick={onContinue} style={{ width: '100%', boxShadow: 'var(--shadow-lg)', fontFamily: 'var(--font-display)' }} size="lg">
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          Entrar al lobby
+          <ArrowRightIcon size={16} weight="bold" aria-hidden="true" />
+        </span>
+      </Button>
     </div>
   )
 }

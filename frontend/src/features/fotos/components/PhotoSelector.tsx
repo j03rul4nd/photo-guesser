@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { CheckIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { LoadingReveal } from '@/components/shared/LoadingReveal'
 import { RandomPickBtn } from './RandomPickBtn'
@@ -262,9 +263,14 @@ export function PhotoSelector({ salaCode, jugadorId, onConfirm, onClose }: Photo
           disabled={fotos.length < MIN_FOTOS}
           onClick={() => void handleConfirmar()}
         >
-          {fotos.length >= MIN_FOTOS
-            ? `✅ Confirmar ${fotos.length} fotos`
-            : `Faltan ${MIN_FOTOS - fotos.length} fotos`}
+          {fotos.length >= MIN_FOTOS ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <CheckIcon size={16} weight="bold" aria-hidden="true" />
+              {`Confirmar ${fotos.length} fotos`}
+            </span>
+          ) : (
+            `Faltan ${MIN_FOTOS - fotos.length} fotos`
+          )}
         </Button>
       </div>
     </div>

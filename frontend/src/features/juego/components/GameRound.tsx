@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PolaroidFrame } from '@/components/shared/PolaroidFrame'
+import { AnimatedNumber } from '@/components/shared/Kinetic'
 import { Timer } from './Timer'
 import { AnswerOptions } from './AnswerOptions'
 import { OwnerWaiting } from './OwnerWaiting'
@@ -85,7 +86,7 @@ export function GameRound({ miId, onAnswer, onTimerExpire, startTimeRef }: GameR
       {/* Header fijo */}
       <header style={{ padding: '12px 20px', backgroundColor: 'var(--bg-surface)', borderBottom: '1px solid var(--bg-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
         <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          Ronda {fotoActual.rondaNum} / {fotoActual.totalRondas}
+          Ronda <AnimatedNumber value={fotoActual.rondaNum} /> / <AnimatedNumber value={fotoActual.totalRondas} />
         </span>
         {showGame && !esMiFoto && (
           <Timer duracionMs={15000} activo={faseRonda === 'showing'} onExpire={onTimerExpire} />

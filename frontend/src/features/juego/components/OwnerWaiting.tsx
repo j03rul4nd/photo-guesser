@@ -1,4 +1,6 @@
 import { ResponseDots } from './ResponseDots'
+import { SparkleIcon } from '@phosphor-icons/react'
+import { SplitText } from '@/components/shared/Kinetic'
 
 interface OwnerWaitingProps {
   count: number
@@ -31,9 +33,13 @@ export function OwnerWaiting({ count, total }: OwnerWaitingProps) {
             fontSize: '1.3rem',
             color: 'var(--text-primary)',
             margin: '0 0 6px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
           }}
         >
-          ✨ Esta foto es tuya
+          <SparkleIcon size={20} weight="duotone" color="var(--accent)" aria-hidden="true" />
+          Esta foto es tuya
         </p>
         <p
           style={{
@@ -44,7 +50,7 @@ export function OwnerWaiting({ count, total }: OwnerWaitingProps) {
             margin: 0,
           }}
         >
-          ¿Cuántos te conocen?
+          <SplitText text="¿Cuántos te conocen?" />
         </p>
       </div>
 
