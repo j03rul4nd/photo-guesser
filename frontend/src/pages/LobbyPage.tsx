@@ -35,9 +35,15 @@ export function LobbyPage() {
   }, [code, jugadorId, nickname, storedCode, setSala, navigate])
 
   // ── Fuente única de verdad para jugadores y host ──────────────────────────
-  const { estado, closedReason, jugadores, hostId, sendMessage, lastEvent } = useGameSocket(code, jugadorId)
+  const {
+    estado, closedReason, jugadores, hostId,
+    puedeIniciar: serverPuedeIniciar, listosCount,
+    sendMessage, lastEvent,
+  } = useGameSocket(code, jugadorId)
 
   const isHost = Boolean(jugadorId && hostId && jugadorId === hostId)
+  // Usar el flag del servidor para garantizar sincronía con el estado interno del DO
+  const puedeIniciar = isHost && serverPuedeIniciar
 
   // ── Reaccionar al motivo de cierre de WS ─────────────────────────────────
   useEffect(() => {
@@ -76,8 +82,6 @@ export function LobbyPage() {
   // ── Selector de fotos ─────────────────────────────────────────────────────
   const [showSelector, setShowSelector] = useState(false)
 
-  const listosCount = jugadores.filter((j) => j.fotosListas && j.conectado).length
-  const puedeIniciar = isHost && listosCount >= 2
   const isDisconnected = estado === 'disconnected' || estado === 'reconnecting'
 
   // ── Pantalla de selección de fotos ───────────────────────────────────────
@@ -171,7 +175,7 @@ export function LobbyPage() {
                       Iniciar partida
                     </span>
                   ) : (
-                    `Esperando fotos (${listosCount}/2 mínimo)`
+                    `Esperando fotos (${listosCount}/${jugadores.filter(j => j.conectado).length} jugadores)`
                   )}
                 </Button>
               </Magnet>

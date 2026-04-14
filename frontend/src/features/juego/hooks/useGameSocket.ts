@@ -16,6 +16,10 @@ interface UseGameSocketReturn {
   closedReason: ClosedReason
   jugadores: Jugador[]
   hostId: string | null
+  /** Refleja el estado interno del DO: true solo cuando estado === 'lobby_ready' */
+  puedeIniciar: boolean
+  /** Cuántos jugadores tienen fotosListas && conectado (según el DO) */
+  listosCount: number
   sendMessage: (msg: ClientWSEvent) => void
   lastEvent: ServerWSEvent | null
 }
@@ -27,6 +31,8 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
   const [closedReason, setClosedReason] = useState<ClosedReason>(null)
   const [jugadores, setJugadores] = useState<Jugador[]>([])
   const [hostId, setHostId] = useState<string | null>(null)
+  const [puedeIniciar, setPuedeIniciar] = useState(false)
+  const [listosCount, setListosCount] = useState(0)
   const [lastEvent, setLastEvent] = useState<ServerWSEvent | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
@@ -66,6 +72,8 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
       if (msg.type === 'LOBBY_UPDATE') {
         setJugadores(msg.jugadores)
         if (msg.hostId) setHostId(msg.hostId)
+        setPuedeIniciar(msg.puedeIniciar)
+        setListosCount(msg.listosCount)
       }
       if (msg.type === 'HOST_CHANGED') {
         setHostId(msg.newHostId)
@@ -125,6 +133,8 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
     unmountedRef.current = false
     roomClosedRef.current = false
     setClosedReason(null)
+    setPuedeIniciar(false)
+    setListosCount(0)
     connect()
 
     return () => {
@@ -146,5 +156,5 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
     }
   }, [])
 
-  return { estado, closedReason, jugadores, hostId, sendMessage, lastEvent }
+  return { estado, closedReason, jugadores, hostId, puedeIniciar, listosCount, sendMessage, lastEvent }
 }

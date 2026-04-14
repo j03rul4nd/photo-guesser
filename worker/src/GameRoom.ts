@@ -40,10 +40,17 @@ type Opcion = { id: string; nickname: string }
 
 // ─── Server → Client event builders ──────────────────────────────────────────
 
-function lobbyUpdateEvent(jugadores: Map<string, Jugador>, hostId: string | null): string {
+function lobbyUpdateEvent(
+  jugadores: Map<string, Jugador>,
+  hostId: string | null,
+  estado: RoomState,
+): string {
+  const listos = Array.from(jugadores.values()).filter((j) => j.fotosListas && j.conectado).length
   return JSON.stringify({
     type: 'LOBBY_UPDATE',
     hostId: hostId ?? '',
+    // El frontend puede mostrar el botón solo cuando el DO está realmente en lobby_ready
+    puedeIniciar: estado === 'lobby_ready',
     jugadores: Array.from(jugadores.values()).map((j) => ({
       id: j.id,
       nickname: j.nickname,
@@ -51,6 +58,8 @@ function lobbyUpdateEvent(jugadores: Map<string, Jugador>, hostId: string | null
       conectado: j.conectado,
       puntuacion: j.puntuacion,
     })),
+    // Conteo auxiliar para mostrar progreso en el frontend
+    listosCount: listos,
   })
 }
 
@@ -163,7 +172,7 @@ export class GameRoom implements DurableObject {
     const existing = this.jugadores.get(jugadorId)
     if (existing) {
       console.log(`[JOIN] re-join HTTP. jugadorId=${jugadorId} nickname=${trimmed}`)
-      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host, this.estado))
       return new Response('OK', { status: 200 })
     }
 
@@ -195,7 +204,7 @@ export class GameRoom implements DurableObject {
     if (!this.host) this.host = jugadorId
 
     console.log(`[JOIN] nuevo jugador. jugadorId=${jugadorId} nickname=${trimmed} host=${this.host} total=${this.jugadores.size}`)
-    this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+    this.broadcast(lobbyUpdateEvent(this.jugadores, this.host, this.estado))
     return new Response('OK', { status: 200 })
   }
 
@@ -274,10 +283,20 @@ export class GameRoom implements DurableObject {
         this.broadcast(JSON.stringify({ type: 'HOST_CHANGED', newHostId: jugadorId }))
       }
 
+      // Si estábamos en `waiting` porque un jugador se desconectó, re-evaluar si volvemos
+      // a `lobby_ready`. Esto cubre la reconexión tras una desconexión temporal.
+      if (this.estado === 'waiting') {
+        const listos = Array.from(this.jugadores.values()).filter((j) => j.fotosListas && j.conectado)
+        if (listos.length >= 2) {
+          this.estado = 'lobby_ready'
+          console.log(`[WS] reconexión completó quórum — estado → lobby_ready`)
+        }
+      }
+
       console.log(`[WS] conectado. jugadorId=${jugadorId} nickname=${jugador.nickname} estado=${this.estado} paused=${this.gamePaused}`)
 
       // Enviar estado actual del lobby a todos
-      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host, this.estado))
 
       // Si el juego ya empezó, reenviar estado al jugador que (re)conecta
       const enPartida: RoomState[] = ['round_showing', 'round_results', 'game_over']
@@ -393,7 +412,7 @@ export class GameRoom implements DurableObject {
     switch (event.type) {
       case 'JOIN': {
         jugador.nickname = event.nickname
-        this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+        this.broadcast(lobbyUpdateEvent(this.jugadores, this.host, this.estado))
         break
       }
 
@@ -409,12 +428,12 @@ export class GameRoom implements DurableObject {
         const listos = Array.from(this.jugadores.values()).filter((j) => j.fotosListas && j.conectado)
         console.log(`[FOTOS_READY] jugadorId=${jugadorId} fotos=${event.fotoKeys.length} listos=${listos.length}/${this.jugadores.size}`)
 
-        this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+        this.broadcast(lobbyUpdateEvent(this.jugadores, this.host, this.estado))
 
         if (listos.length >= 2 && this.estado === 'waiting') {
           this.estado = 'lobby_ready'
           console.log(`[FOTOS_READY] estado → lobby_ready`)
-          this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+          this.broadcast(lobbyUpdateEvent(this.jugadores, this.host, this.estado))
         }
         break
       }
@@ -434,7 +453,7 @@ export class GameRoom implements DurableObject {
         if (listos.length < 2) {
           console.log(`[START_GAME] rechazado — solo ${listos.length} jugadores listos`)
           this.estado = 'waiting'
-          this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+          this.broadcast(lobbyUpdateEvent(this.jugadores, this.host, this.estado))
           return
         }
         await this.startGame()
@@ -711,7 +730,7 @@ export class GameRoom implements DurableObject {
     this.estado = 'waiting'
 
     this.broadcast(JSON.stringify({ type: 'GAME_RESET' }))
-    this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+    this.broadcast(lobbyUpdateEvent(this.jugadores, this.host, this.estado))
   }
 
   // ─── Disconnect handling ────────────────────────────────────────────────────
@@ -755,10 +774,10 @@ export class GameRoom implements DurableObject {
         console.log(`[DISCONNECT] lobby_ready → waiting (solo ${listos.length} listos)`)
         this.estado = 'waiting'
       }
-      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host, this.estado))
 
     } else if (this.estado === 'round_showing') {
-      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host, this.estado))
 
       if (this.connections.size === 0) {
         // Todos se desconectaron — pausar para no desperdiciar recursos
@@ -781,7 +800,7 @@ export class GameRoom implements DurableObject {
       }
 
     } else if (this.estado === 'round_results') {
-      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host, this.estado))
       if (this.connections.size === 0) {
         this.gamePaused = true
         console.log(`[PAUSE] todos desconectados en round_results`)
@@ -789,7 +808,7 @@ export class GameRoom implements DurableObject {
 
     } else {
       // game_over, resetting: solo actualizar lobby
-      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host))
+      this.broadcast(lobbyUpdateEvent(this.jugadores, this.host, this.estado))
     }
   }
 

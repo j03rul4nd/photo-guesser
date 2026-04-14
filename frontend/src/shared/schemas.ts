@@ -34,6 +34,8 @@ export const ServerWSEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('LOBBY_UPDATE'),
     hostId: z.string(),
+    puedeIniciar: z.boolean(),
+    listosCount: z.number().int().min(0),
     jugadores: z.array(JugadorSchema),
   }),
   z.object({
