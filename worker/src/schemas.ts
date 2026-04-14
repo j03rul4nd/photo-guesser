@@ -25,6 +25,7 @@ export const ClientWSEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('PLAY_AGAIN') }),
   z.object({ type: z.literal('ABORT_GAME') }),
+  z.object({ type: z.literal('PING') }),
 ])
 
 export type ClientWSEvent = z.infer<typeof ClientWSEventSchema>

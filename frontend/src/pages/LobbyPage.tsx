@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { GameControllerIcon, ImagesIcon } from '@phosphor-icons/react'
+import { GameControllerIcon, ImagesIcon, CheckCircleIcon } from '@phosphor-icons/react'
 import { Copy, Check, Wifi, WifiOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Magnet, WordFadeIn } from '@/components/shared/Kinetic'
@@ -44,6 +44,7 @@ export function LobbyPage() {
   const isHost = Boolean(jugadorId && hostId && jugadorId === hostId)
   // Usar el flag del servidor para garantizar sincronía con el estado interno del DO
   const puedeIniciar = isHost && serverPuedeIniciar
+  const miJugador = jugadores.find((j) => j.id === jugadorId)
 
   // ── Reaccionar al motivo de cierre de WS ─────────────────────────────────
   useEffect(() => {
@@ -142,16 +143,29 @@ export function LobbyPage() {
         <PlayerList jugadores={jugadores} hostId={hostId} miId={jugadorId} />
 
         <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <Button
-            variant="secondary"
-            style={{ width: '100%', border: '2px solid var(--text-primary)', boxShadow: 'var(--shadow-sm)', fontWeight: 700 }}
-            onClick={() => setShowSelector(true)}
-          >
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <ImagesIcon size={18} weight="duotone" aria-hidden="true" />
-              Elegir mis fotos
-            </span>
-          </Button>
+          {miJugador?.fotosListas ? (
+            <Button
+              variant="secondary"
+              style={{ width: '100%', border: '2px solid var(--correct)', boxShadow: 'var(--shadow-sm)', fontWeight: 700, color: 'var(--correct)' }}
+              onClick={() => setShowSelector(true)}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircleIcon size={18} weight="duotone" aria-hidden="true" />
+                Fotos listas · Cambiar
+              </span>
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              style={{ width: '100%', border: '2px solid var(--text-primary)', boxShadow: 'var(--shadow-sm)', fontWeight: 700 }}
+              onClick={() => setShowSelector(true)}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <ImagesIcon size={18} weight="duotone" aria-hidden="true" />
+                Elegir mis fotos
+              </span>
+            </Button>
+          )}
 
           {isHost && (
             <>

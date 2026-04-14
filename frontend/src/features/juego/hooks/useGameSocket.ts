@@ -25,6 +25,7 @@ interface UseGameSocketReturn {
 }
 
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 10000]
+const HEARTBEAT_INTERVAL_MS = 25_000
 
 export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocketReturn {
   const [estado, setEstado] = useState<ConexionEstado>('connecting')
@@ -40,6 +41,34 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
   const unmountedRef = useRef(false)
   const roomClosedRef = useRef(false)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  /**
+   * pendingFotosReadyRef — si el usuario confirmó sus fotos pero el WS se cerró
+   * antes de que el DO confirmase la recepción (fotosListas: true en LOBBY_UPDATE),
+   * guardamos las keys aquí para reenviarlas en el próximo onopen.
+   */
+  const pendingFotosReadyRef = useRef<string[] | null>(null)
+
+  // ── Heartbeat helpers ──────────────────────────────────────────────────────
+
+  const startHeartbeat = useCallback(() => {
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current)
+    heartbeatRef.current = setInterval(() => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'PING' }))
+      }
+    }, HEARTBEAT_INTERVAL_MS)
+  }, [])
+
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current)
+      heartbeatRef.current = null
+    }
+  }, [])
+
+  // ── Conexión ───────────────────────────────────────────────────────────────
 
   const connect = useCallback(() => {
     if (unmountedRef.current) return
@@ -55,6 +84,13 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
       if (unmountedRef.current) { ws.close(); return }
       attemptRef.current = 0
       setEstado('connected')
+      startHeartbeat()
+
+      // Reenviar FOTOS_READY pendiente si el servidor aún no lo había confirmado
+      if (pendingFotosReadyRef.current) {
+        const fotoKeys = pendingFotosReadyRef.current
+        ws.send(JSON.stringify({ type: 'FOTOS_READY', fotoKeys }))
+      }
     }
 
     ws.onmessage = (event) => {
@@ -74,6 +110,12 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
         if (msg.hostId) setHostId(msg.hostId)
         setPuedeIniciar(msg.puedeIniciar)
         setListosCount(msg.listosCount)
+
+        // Si el servidor confirmó que nuestras fotos están listas → cancelar reenvío pendiente
+        const miJugador = msg.jugadores.find((j) => j.id === jugadorId)
+        if (miJugador?.fotosListas) {
+          pendingFotosReadyRef.current = null
+        }
       }
       if (msg.type === 'HOST_CHANGED') {
         setHostId(msg.newHostId)
@@ -92,6 +134,7 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
       // ignorar el close de la WS reemplazada para no anular el estado correcto.
       if (wsRef.current !== null && wsRef.current !== ws) return
 
+      stopHeartbeat()
       setEstado('disconnected')
       wsRef.current = null
 
@@ -127,7 +170,7 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
     ws.onerror = () => {
       ws.close()
     }
-  }, [salaCode, jugadorId])
+  }, [salaCode, jugadorId, startHeartbeat, stopHeartbeat])
 
   useEffect(() => {
     unmountedRef.current = false
@@ -139,21 +182,30 @@ export function useGameSocket(salaCode: string, jugadorId: string): UseGameSocke
 
     return () => {
       unmountedRef.current = true
+      stopHeartbeat()
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
       if (wsRef.current) {
         wsRef.current.onclose = null // evitar reconexión en unmount
         wsRef.current.close()
       }
     }
-  }, [connect])
+  }, [connect, stopHeartbeat])
 
   const sendMessage = useCallback((msg: ClientWSEvent) => {
     // Validar antes de enviar
     const parsed = ClientWSEventSchema.safeParse(msg)
     if (!parsed.success) return
+
+    // Guardar FOTOS_READY como pendiente hasta que el DO confirme fotosListas: true
+    if (parsed.data.type === 'FOTOS_READY') {
+      pendingFotosReadyRef.current = parsed.data.fotoKeys
+    }
+
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(parsed.data))
     }
+    // Si el WS no está abierto y es FOTOS_READY, ya quedó guardado en pendingFotosReadyRef
+    // y se reenviará en el próximo onopen.
   }, [])
 
   return { estado, closedReason, jugadores, hostId, puedeIniciar, listosCount, sendMessage, lastEvent }

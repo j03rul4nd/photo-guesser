@@ -512,6 +512,12 @@ export class GameRoom implements DurableObject {
         await this.endGame()
         break
       }
+
+      case 'PING': {
+        // Keepalive — solo actualizar lastActivity, sin broadcast
+        this.lastActivity = Date.now()
+        break
+      }
     }
   }
 

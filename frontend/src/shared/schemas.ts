@@ -124,6 +124,10 @@ export const ClientWSEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('ABORT_GAME'),
   }),
+  // keepalive — prevents idle WS timeouts
+  z.object({
+    type: z.literal('PING'),
+  }),
 ])
 
 export type ClientWSEvent = z.infer<typeof ClientWSEventSchema>
